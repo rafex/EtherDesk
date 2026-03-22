@@ -385,22 +385,6 @@
       </li>
     </ul>
 
-    <nav class="desktop-dock" aria-label="Aplicaciones">
-      <button
-        v-for="app in apps"
-        :key="app.id"
-        class="desktop-dock__item"
-        :class="{ 'desktop-dock__item--active': isAppOpen(app.id) }"
-        type="button"
-        :title="app.description"
-        @click.stop="openAppWindow(app.id)"
-      >
-        <span class="desktop-dock__icon">{{ app.icon }}</span>
-        <span class="desktop-dock__name">{{ app.name }}</span>
-        <span v-if="isAppOpen(app.id)" class="desktop-dock__indicator"></span>
-      </button>
-    </nav>
-
     <section class="desktop-notifications" aria-label="Notificaciones del sistema">
       <article
         v-for="notification in notifications"
@@ -446,6 +430,13 @@
         </button>
       </article>
     </section>
+
+    <div class="desktop-rating" aria-label="Calificacion del sistema">
+      <label v-for="value in ratingOptions" :key="value" class="desktop-rating__label">
+        <input v-model="desktopRating" type="radio" name="desktop-rating" :value="value" />
+        <span class="desktop-rating__star"></span>
+      </label>
+    </div>
 
     <div
       v-if="contextMenu.visible"
@@ -513,6 +504,7 @@ interface BrowserTab {
 const WINDOW_WIDTH = 440;
 const WINDOW_HEIGHT = 320;
 const MAXIMIZED_MARGIN = 18;
+const MAXIMIZED_TOP_OFFSET = 60;
 const MIN_WINDOW_WIDTH = 320;
 const MIN_WINDOW_HEIGHT = 220;
 
@@ -540,6 +532,8 @@ const notifications = ref<DesktopNotification[]>([]);
 const isAltTheme = ref(false);
 const isLauncherOpen = ref(false);
 const launcherQuery = ref('');
+const desktopRating = ref('0');
+const ratingOptions = ['5', '4', '3', '2', '1'];
 const nextBrowserTabId = ref(3);
 const browserTabs = ref<BrowserTab[]>([
   { id: 1, title: 'Uiverse', url: 'uiverse.io' },
@@ -581,7 +575,7 @@ const windows = ref<DesktopWindow[]>([
     appName: 'EtherDesk',
     label: 'Sesion activa',
     title: `Bienvenido ${props.userName}`,
-    description: 'El escritorio esta listo. Puedes abrir apps desde el dock, mover ventanas y usar clic derecho sobre el fondo.',
+    description: 'El escritorio esta listo. Puedes abrir apps desde el launcher, mover ventanas y usar clic derecho sobre el fondo.',
     x: 64,
     y: 56,
     width: 500,
@@ -692,7 +686,7 @@ function minimizeWindow(windowId: string) {
   }
 
   windowItem.isMinimized = true;
-  notify('Ventana minimizada', `${windowItem.appName} se envio al dock.`);
+  notify('Ventana minimizada', `${windowItem.appName} se envio al area de minimizadas.`);
 
   const fallbackWindow = visibleWindows.value.find((item) => item.id !== windowId);
   activeWindowId.value = fallbackWindow?.id ?? '';
@@ -856,7 +850,7 @@ function startResize(event: MouseEvent, windowId: string, direction: ResizeDirec
 function windowStyle(windowItem: DesktopWindow) {
   if (windowItem.isMaximized) {
     return {
-      inset: `${MAXIMIZED_MARGIN}px ${MAXIMIZED_MARGIN}px 92px ${MAXIMIZED_MARGIN}px`,
+      inset: `${MAXIMIZED_TOP_OFFSET}px ${MAXIMIZED_MARGIN}px ${MAXIMIZED_MARGIN}px ${MAXIMIZED_MARGIN}px`,
       zIndex: String(windowItem.zIndex),
     };
   }

@@ -392,7 +392,7 @@ button {
 
 .desktop-topbar {
   position: absolute;
-  top: 22px;
+  top: 12px;
   right: 22px;
   z-index: 90;
 }
@@ -449,7 +449,7 @@ button {
 
 .desktop-topbar__tooltip {
   position: absolute;
-  bottom: calc(100% + 10px);
+  top: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%);
   padding: 8px 12px;
@@ -470,11 +470,11 @@ button {
 .desktop-topbar__tooltip::after {
   content: '';
   position: absolute;
-  top: 100%;
+  bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
   border: 6px solid transparent;
-  border-top-color: rgba(0, 0, 0, 0.85);
+  border-bottom-color: rgba(0, 0, 0, 0.85);
 }
 
 .desktop-topbar__item:hover .desktop-topbar__tooltip {
@@ -1410,25 +1410,6 @@ button {
   color: #8e8e8e;
 }
 
-.desktop-dock {
-  position: absolute;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 30px;
-  background: var(--desktop-dock-bg);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.26);
-  backdrop-filter: blur(20px);
-  overflow-x: auto;
-  max-width: min(92vw, 720px);
-  z-index: 60;
-}
-
 .desktop-minimized-dock {
   position: absolute;
   left: 18px;
@@ -1532,6 +1513,39 @@ button {
   box-shadow: 0 14px 24px rgba(0, 0, 0, 0.28);
 }
 
+.desktop-rating {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: row-reverse;
+  z-index: 70;
+}
+
+.desktop-rating input[type="radio"] {
+  display: none;
+}
+
+.desktop-rating__label {
+  margin: 0 2px;
+  cursor: pointer;
+}
+
+.desktop-rating__star {
+  display: inline-block;
+  font-size: 30px;
+  color: rgba(187, 183, 183, 0.726);
+}
+
+.desktop-rating__star::before {
+  content: "\2605";
+}
+
+.desktop-rating input[type="radio"]:checked ~ .desktop-rating__star::before {
+  content: "\2606";
+  color: #016bf5;
+}
+
 .desktop-notification__content {
   display: flex;
   align-items: center;
@@ -1594,53 +1608,6 @@ button {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.desktop-dock__item {
-  display: grid;
-  gap: 8px;
-  min-width: 80px;
-  padding: 10px 8px 14px;
-  border: 0;
-  border-radius: 18px;
-  color: inherit;
-  background: transparent;
-  transition:
-    transform 140ms ease,
-    background 140ms ease;
-}
-
-.desktop-dock__item:hover {
-  transform: translateY(-6px) scale(1.03);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.desktop-dock__item--active .desktop-dock__icon {
-  box-shadow: 0 0 0 2px rgba(205, 225, 255, 0.24);
-}
-
-.desktop-dock__icon {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  margin: 0 auto;
-  border-radius: 14px;
-  color: var(--desktop-dock-icon-color);
-  font-weight: 700;
-  background: var(--desktop-dock-icon-bg);
-}
-
-.desktop-dock__name {
-  font-size: 0.8rem;
-}
-
-.desktop-dock__indicator {
-  width: 6px;
-  height: 6px;
-  margin: 0 auto;
-  border-radius: 50%;
-  background: #9cd0ff;
-}
-
 .desktop-context-menu {
   position: absolute;
   min-width: 170px;
@@ -1678,14 +1645,6 @@ button {
     inset: 12px 12px 104px 12px !important;
   }
 
-  .desktop-dock {
-    width: calc(100% - 24px);
-    justify-content: flex-start;
-    transform: none;
-    left: 12px;
-    bottom: 12px;
-  }
-
   .desktop-minimized-dock {
     left: 12px;
     bottom: 124px;
@@ -1697,8 +1656,13 @@ button {
     width: min(288px, calc(100vw - 24px));
   }
 
+  .desktop-rating {
+    right: 12px;
+    bottom: 12px;
+  }
+
   .desktop-topbar {
-    top: 12px;
+    top: 8px;
     right: 12px;
   }
 

@@ -2,6 +2,12 @@ import type { AppShortcut } from '@/shared/types';
 
 export const desktopApps: AppShortcut[] = [
   {
+    id: 'browser',
+    name: 'Browser',
+    description: 'Navegador web conceptual dentro de EtherDesk.',
+    icon: 'B',
+  },
+  {
     id: 'notes',
     name: 'Notes',
     description: 'Editor de texto simple para la PoC.',

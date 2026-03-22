@@ -162,42 +162,108 @@
         :key="windowItem.id"
         class="desktop-window"
         :class="{
+          'desktop-window--browser': windowItem.appId === 'browser',
           'desktop-window--focused': windowItem.id === activeWindowId,
           'desktop-window--maximized': windowItem.isMaximized,
         }"
         :style="windowStyle(windowItem)"
         @mousedown="focusWindow(windowItem.id)"
       >
-        <header class="desktop-window__header" @mousedown.stop="startDrag($event, windowItem.id)">
-          <div class="desktop-window__traffic-lights">
+        <header
+          v-if="windowItem.appId !== 'browser'"
+          class="desktop-window__header"
+          @mousedown.stop="startDrag($event, windowItem.id)"
+        >
+          <div class="desktop-window__title">
+            <span>{{ windowItem.title }}.app</span>
+          </div>
+
+          <div class="desktop-window__controls">
             <button
-              class="desktop-window__traffic-light desktop-window__traffic-light--red"
+              class="desktop-window__control desktop-window__control--minimize"
               type="button"
               aria-label="Minimizar ventana"
               @click.stop="minimizeWindow(windowItem.id)"
-            ></button>
+            >
+              <svg viewBox="0 0 10.2 1" aria-hidden="true"><rect height="1" width="10.2" y="0" x="0"></rect></svg>
+            </button>
             <button
-              class="desktop-window__traffic-light desktop-window__traffic-light--yellow"
+              class="desktop-window__control desktop-window__control--maximize"
               type="button"
               aria-label="Maximizar ventana"
               @click.stop="toggleMaximize(windowItem.id)"
-            ></button>
+            >
+              <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M0,0v10h10V0H0z M9,9H1V1h8V9z"></path></svg>
+            </button>
             <button
-              class="desktop-window__traffic-light desktop-window__traffic-light--green"
+              class="desktop-window__control desktop-window__control--close"
               type="button"
-              aria-label="Cerrar sesion"
-              @click.stop="$emit('logout')"
-            ></button>
-          </div>
-
-          <div class="desktop-window__title">
-            <p class="desktop-window__label">{{ windowItem.label }}</p>
-            <span>{{ windowItem.title }}.app</span>
+              aria-label="Cerrar ventana"
+              @click.stop="closeWindow(windowItem.id)"
+            >
+              <svg viewBox="0 0 10 10" aria-hidden="true"><polygon points="10.2,0.7 9.5,0 5.1,4.4 0.7,0 0,0.7 4.4,5.1 0,9.5 0.7,10.2 5.1,5.8 9.5,10.2 10.2,9.5 5.8,5.1"></polygon></svg>
+            </button>
           </div>
         </header>
 
-        <div class="desktop-window__body">
-          <div v-if="windowItem.appId === 'tars-chat'" class="desktop-chat">
+        <div class="desktop-window__body" :class="{ 'desktop-window__body--browser': windowItem.appId === 'browser' }">
+          <div v-if="windowItem.appId === 'browser'" class="desktop-browser">
+            <div class="desktop-browser__tabs-head">
+              <div class="desktop-browser__tabs-list">
+                <button
+                  v-for="tab in browserTabs"
+                  :key="tab.id"
+                  class="desktop-browser__tab-open"
+                  type="button"
+                  @click="selectBrowserTab(tab.id)"
+                >
+                  <div class="desktop-browser__rounded desktop-browser__rounded--left">
+                    <div class="desktop-browser__mask-round"></div>
+                  </div>
+                  <span class="desktop-browser__tab-name">{{ tab.title }}</span>
+                  <span class="desktop-browser__close-tab" @click.stop="closeBrowserTab(tab.id)">✕</span>
+                  <div class="desktop-browser__rounded desktop-browser__rounded--right">
+                    <div class="desktop-browser__mask-round"></div>
+                  </div>
+                </button>
+              </div>
+
+              <div class="desktop-browser__window-opt" @mousedown.stop>
+                <button type="button" aria-label="Minimizar" @click.stop="minimizeWindow(windowItem.id)">-</button>
+                <button type="button" aria-label="Maximizar" @click.stop="toggleMaximize(windowItem.id)">□</button>
+                <button class="desktop-browser__window-close" type="button" aria-label="Cerrar" @click.stop="closeWindow(windowItem.id)">✕</button>
+              </div>
+            </div>
+
+            <div class="desktop-browser__head" @mousedown.stop="startDrag($event, windowItem.id)">
+              <button class="desktop-browser__nav-btn" type="button">←</button>
+              <button class="desktop-browser__nav-btn" type="button" disabled>→</button>
+
+              <input
+                :value="activeBrowserTab?.url ?? ''"
+                class="desktop-browser__input"
+                type="text"
+                placeholder="Search Google or type URL"
+                @input="updateBrowserUrl"
+              />
+
+              <button class="desktop-browser__nav-btn" type="button">⋮</button>
+              <button class="desktop-browser__star" type="button">✰</button>
+            </div>
+
+            <div class="desktop-browser__viewport">
+              <div class="desktop-browser__page">
+                <p class="desktop-browser__page-url">{{ activeBrowserTab?.url }}</p>
+                <h3>{{ activeBrowserTab?.title }}</h3>
+                <p>
+                  Browser conceptual dentro de EtherDesk con tabs funcionales. Esta ventana usa sus propios
+                  controles de minimizar, maximizar y cerrar, sin depender del chrome general del sistema.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="windowItem.appId === 'tars-chat'" class="desktop-chat">
             <div class="desktop-chat__header">
               <div class="desktop-chat__brand">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -285,8 +351,39 @@
             </div>
           </div>
         </div>
+
+        <div
+          v-if="!windowItem.isMaximized"
+          class="desktop-window__resize-handle desktop-window__resize-handle--right"
+          @mousedown.stop="startResize($event, windowItem.id, 'right')"
+        ></div>
+        <div
+          v-if="!windowItem.isMaximized"
+          class="desktop-window__resize-handle desktop-window__resize-handle--bottom"
+          @mousedown.stop="startResize($event, windowItem.id, 'bottom')"
+        ></div>
+        <div
+          v-if="!windowItem.isMaximized"
+          class="desktop-window__resize-handle desktop-window__resize-handle--corner"
+          @mousedown.stop="startResize($event, windowItem.id, 'corner')"
+        ></div>
       </article>
     </section>
+
+    <ul v-if="minimizedWindows.length > 0" class="desktop-minimized-dock" aria-label="Ventanas minimizadas">
+      <li v-for="windowItem in minimizedWindows" :key="windowItem.id" class="desktop-minimized-dock__item">
+        <button
+          class="desktop-minimized-dock__button"
+          type="button"
+          :aria-label="`Restaurar ${windowItem.title}`"
+          @click.stop="restoreWindow(windowItem.id)"
+        >
+          <span class="desktop-minimized-dock__filled"></span>
+          <span class="desktop-minimized-dock__icon">{{ windowIcon(windowItem) }}</span>
+        </button>
+        <div class="desktop-minimized-dock__tooltip">{{ windowItem.title }}</div>
+      </li>
+    </ul>
 
     <nav class="desktop-dock" aria-label="Aplicaciones">
       <button
@@ -405,9 +502,19 @@ interface ChatMessage {
   time: string;
 }
 
+type ResizeDirection = 'right' | 'bottom' | 'corner';
+
+interface BrowserTab {
+  id: number;
+  title: string;
+  url: string;
+}
+
 const WINDOW_WIDTH = 440;
 const WINDOW_HEIGHT = 320;
 const MAXIMIZED_MARGIN = 18;
+const MIN_WINDOW_WIDTH = 320;
+const MIN_WINDOW_HEIGHT = 220;
 
 const props = defineProps<{
   apps: AppShortcut[];
@@ -433,6 +540,12 @@ const notifications = ref<DesktopNotification[]>([]);
 const isAltTheme = ref(false);
 const isLauncherOpen = ref(false);
 const launcherQuery = ref('');
+const nextBrowserTabId = ref(3);
+const browserTabs = ref<BrowserTab[]>([
+  { id: 1, title: 'Uiverse', url: 'uiverse.io' },
+  { id: 2, title: 'Rafex', url: 'rafex.dev' },
+]);
+const activeBrowserTabId = ref(1);
 const nextChatMessageId = ref(5);
 const chatDraft = ref('');
 const chatMessages = ref<ChatMessage[]>([
@@ -480,6 +593,10 @@ const windows = ref<DesktopWindow[]>([
 ]);
 
 const visibleWindows = computed(() => windows.value.filter((windowItem) => !windowItem.isMinimized));
+const minimizedWindows = computed(() => windows.value.filter((windowItem) => windowItem.isMinimized));
+const activeBrowserTab = computed(() => {
+  return browserTabs.value.find((tab) => tab.id === activeBrowserTabId.value) ?? browserTabs.value[0] ?? null;
+});
 const filteredApps = computed(() => {
   const normalizedQuery = launcherQuery.value.trim().toLowerCase();
 
@@ -497,6 +614,17 @@ let dragState:
       id: string;
       offsetX: number;
       offsetY: number;
+    }
+  | null = null;
+
+let resizeState:
+  | {
+      id: string;
+      direction: ResizeDirection;
+      startX: number;
+      startY: number;
+      startWidth: number;
+      startHeight: number;
     }
   | null = null;
 
@@ -570,6 +698,30 @@ function minimizeWindow(windowId: string) {
   activeWindowId.value = fallbackWindow?.id ?? '';
 }
 
+function restoreWindow(windowId: string) {
+  const windowItem = windows.value.find((item) => item.id === windowId);
+  if (!windowItem) {
+    return;
+  }
+
+  windowItem.isMinimized = false;
+  focusWindow(windowId);
+  notify('Ventana restaurada', `${windowItem.appName} volvio al escritorio.`);
+}
+
+function closeWindow(windowId: string) {
+  const windowItem = windows.value.find((item) => item.id === windowId);
+  if (!windowItem) {
+    return;
+  }
+
+  windows.value = windows.value.filter((item) => item.id !== windowId);
+
+  const fallbackWindow = windows.value.find((item) => !item.isMinimized);
+  activeWindowId.value = fallbackWindow?.id ?? '';
+  notify('Ventana cerrada', `${windowItem.appName} se cerro.`);
+}
+
 function toggleMaximize(windowId: string) {
   const windowItem = windows.value.find((item) => item.id === windowId);
   if (!windowItem) {
@@ -599,6 +751,14 @@ function restoreAllWindows() {
 
 function isAppOpen(appId: string) {
   return windows.value.some((windowItem) => windowItem.appId === appId && !windowItem.isMinimized);
+}
+
+function windowIcon(windowItem: DesktopWindow) {
+  if (windowItem.appId === 'system') {
+    return 'O';
+  }
+
+  return props.apps.find((app) => app.id === windowItem.appId)?.icon ?? windowItem.appName.charAt(0).toUpperCase();
 }
 
 function openContextMenu(event: MouseEvent) {
@@ -675,6 +835,24 @@ function stopDrag() {
   dragState = null;
 }
 
+function startResize(event: MouseEvent, windowId: string, direction: ResizeDirection) {
+  const windowItem = windows.value.find((item) => item.id === windowId);
+  if (!windowItem || windowItem.isMaximized) {
+    return;
+  }
+
+  focusWindow(windowId);
+
+  resizeState = {
+    id: windowId,
+    direction,
+    startX: event.clientX,
+    startY: event.clientY,
+    startWidth: windowItem.width,
+    startHeight: windowItem.height,
+  };
+}
+
 function windowStyle(windowItem: DesktopWindow) {
   if (windowItem.isMaximized) {
     return {
@@ -705,6 +883,64 @@ function buildWindowContent(windowItem: DesktopWindow) {
     '- maximize enabled',
     '- context menu enabled',
   ].join('\n');
+}
+
+function selectBrowserTab(tabId: number) {
+  activeBrowserTabId.value = tabId;
+}
+
+function addBrowserTab() {
+  const id = nextBrowserTabId.value++;
+  browserTabs.value.push({
+    id,
+    title: `Tab ${id}`,
+    url: 'new-tab.local',
+  });
+  activeBrowserTabId.value = id;
+}
+
+function closeBrowserTab(tabId: number) {
+  if (browserTabs.value.length === 1) {
+    browserTabs.value[0] = {
+      id: browserTabs.value[0].id,
+      title: 'New Tab',
+      url: 'new-tab.local',
+    };
+    activeBrowserTabId.value = browserTabs.value[0].id;
+    return;
+  }
+
+  browserTabs.value = browserTabs.value.filter((tab) => tab.id !== tabId);
+
+  if (activeBrowserTabId.value === tabId) {
+    activeBrowserTabId.value = browserTabs.value[0]?.id ?? 0;
+  }
+}
+
+function updateBrowserUrl(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const currentTab = activeBrowserTab.value;
+
+  if (!currentTab) {
+    return;
+  }
+
+  currentTab.url = target.value;
+  currentTab.title = deriveBrowserTitle(target.value);
+}
+
+function deriveBrowserTitle(url: string) {
+  const normalized = url.trim();
+  if (!normalized) {
+    return 'New Tab';
+  }
+
+  const hostname = normalized
+    .replace(/^https?:\/\//, '')
+    .split('/')[0]
+    .split('.')[0];
+
+  return hostname ? hostname.charAt(0).toUpperCase() + hostname.slice(1) : 'New Tab';
 }
 
 function notify(title: string, description: string) {
@@ -814,13 +1050,47 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function handleResizeMove(event: MouseEvent) {
+  if (!resizeState || !desktopRef.value) {
+    return;
+  }
+
+  const bounds = desktopRef.value.getBoundingClientRect();
+  const windowItem = windows.value.find((item) => item.id === resizeState?.id);
+
+  if (!windowItem || windowItem.isMaximized) {
+    return;
+  }
+
+  const deltaX = event.clientX - resizeState.startX;
+  const deltaY = event.clientY - resizeState.startY;
+  const maxWidth = bounds.width - windowItem.x - 12;
+  const maxHeight = bounds.height - windowItem.y - 96;
+
+  if (resizeState.direction === 'right' || resizeState.direction === 'corner') {
+    windowItem.width = Math.max(MIN_WINDOW_WIDTH, Math.min(resizeState.startWidth + deltaX, maxWidth));
+  }
+
+  if (resizeState.direction === 'bottom' || resizeState.direction === 'corner') {
+    windowItem.height = Math.max(MIN_WINDOW_HEIGHT, Math.min(resizeState.startHeight + deltaY, maxHeight));
+  }
+}
+
+function stopResize() {
+  resizeState = null;
+}
+
 window.addEventListener('mousemove', handleMouseMove);
 window.addEventListener('mouseup', stopDrag);
+window.addEventListener('mousemove', handleResizeMove);
+window.addEventListener('mouseup', stopResize);
 window.addEventListener('keydown', handleKeydown);
 
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('mouseup', stopDrag);
+  window.removeEventListener('mousemove', handleResizeMove);
+  window.removeEventListener('mouseup', stopResize);
   window.removeEventListener('keydown', handleKeydown);
 });
 </script>

@@ -8,13 +8,57 @@
   >
     <div class="desktop-shell__wallpaper"></div>
 
-    <div class="desktop-shell__theme-toggle">
-      <label class="ui-switch" aria-label="Cambiar color del sistema">
-        <input v-model="isAltTheme" type="checkbox" @change="handleThemeToggle" />
-        <div class="slider">
-          <div class="circle"></div>
-        </div>
-      </label>
+    <div class="desktop-topbar">
+      <nav class="desktop-topbar__nav" aria-label="Barra superior del sistema">
+        <button class="desktop-topbar__item" type="button" @click.stop="openLauncher">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <path d="M9 22V12h6v10"></path>
+          </svg>
+          <span class="desktop-topbar__tooltip">Home</span>
+        </button>
+
+        <button class="desktop-topbar__item" type="button" @click.stop="restoreAllWindows">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 21H4.6c-1.1 0-2-.9-2-2V3"></path>
+            <path d="m19 8-7 6-4-4-4 4"></path>
+          </svg>
+          <span class="desktop-topbar__tooltip">Analytics</span>
+        </button>
+
+        <button class="desktop-topbar__item" type="button" @click.stop="notifyNotificationCenter">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span class="desktop-topbar__tooltip">Notifications</span>
+        </button>
+
+        <button class="desktop-topbar__item" type="button" @click.stop="openAppWindow('tars-chat')">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+            ></path>
+          </svg>
+          <span class="desktop-topbar__tooltip">Messages</span>
+        </button>
+
+        <button class="desktop-topbar__item" type="button" @click.stop="toggleTheme">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+            ></path>
+          </svg>
+          <span class="desktop-topbar__tooltip">Settings / Color</span>
+        </button>
+
+        <label class="desktop-topbar__theme-switch" @click.stop>
+          <span>Color</span>
+          <input v-model="isAltTheme" type="checkbox" @change="handleThemeToggle" />
+          <span class="desktop-topbar__theme-slider"></span>
+        </label>
+      </nav>
     </div>
 
     <section
@@ -687,6 +731,15 @@ function handleThemeToggle() {
     'Tema actualizado',
     isAltTheme.value ? 'El sistema cambio a la paleta nocturna.' : 'El sistema volvio a la paleta oceano.',
   );
+}
+
+function toggleTheme() {
+  isAltTheme.value = !isAltTheme.value;
+  handleThemeToggle();
+}
+
+function notifyNotificationCenter() {
+  notify('Notifications', 'El centro de notificaciones estara disponible en una siguiente iteracion.');
 }
 
 function sendChatMessage() {

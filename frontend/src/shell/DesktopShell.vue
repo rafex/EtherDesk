@@ -231,25 +231,33 @@
               <button class="desktop-browser__nav-btn" type="button" disabled>→</button>
 
               <input
-                :value="activeBrowserTab?.url ?? ''"
+                v-model="browserAddressDraft"
                 class="desktop-browser__input"
                 type="text"
-                placeholder="Search Google or type URL"
-                @input="updateBrowserUrl"
+                placeholder="rafex.dev o duckduckgo.com"
+                @keydown.enter.prevent="navigateBrowser"
               />
 
-              <button class="desktop-browser__nav-btn" type="button">⋮</button>
-              <button class="desktop-browser__star" type="button">✰</button>
+              <button class="desktop-browser__nav-btn" type="button" @click="navigateBrowser">↵</button>
+              <button class="desktop-browser__star" type="button" @click="navigateBrowser">✰</button>
             </div>
 
             <div class="desktop-browser__viewport">
-              <div class="desktop-browser__page">
+              <iframe
+                v-if="activeBrowserSrc"
+                :key="activeBrowserSrc"
+                class="desktop-browser__frame"
+                :src="activeBrowserSrc"
+                title="EtherDesk Browser"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                referrerpolicy="strict-origin-when-cross-origin"
+              ></iframe>
+
+              <div v-else class="desktop-browser__page">
                 <p class="desktop-browser__page-url">{{ activeBrowserTab?.url }}</p>
-                <h3>{{ activeBrowserTab?.title }}</h3>
-                <p>
-                  Browser conceptual dentro de EtherDesk con tabs funcionales. Esta ventana usa sus propios
-                  controles de minimizar, maximizar y cerrar, sin depender del chrome general del sistema.
-                </p>
+                <h3>Navegacion restringida</h3>
+                <p>{{ activeBrowserMessage }}</p>
+                <p>Sitios permitidos: `rafex.dev` y `duckduckgo.com`.</p>
               </div>
             </div>
           </div>
@@ -399,6 +407,18 @@
                 </button>
               </div>
             </section>
+          </div>
+
+          <div v-else-if="windowItem.appId === 'notes'" class="desktop-app-surface">
+            <NotesEditor :theme-mode="isAltTheme ? 'sand' : 'ocean'" />
+          </div>
+
+          <div v-else-if="windowItem.appId === 'terminal'" class="desktop-app-surface">
+            <TerminalPane
+              :apps="props.apps.map((app) => app.name)"
+              :theme-mode="isAltTheme ? 'sand' : 'ocean'"
+              :user-name="profileDraft.name"
+            />
           </div>
 
           <div v-else-if="windowItem.appId === 'notification-center'" class="desktop-notification-center">
@@ -566,8 +586,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type { AppShortcut, ServiceAlert } from '@/shared/types';
+
+const NotesEditor = defineAsyncComponent(() => import('@/editor/NotesEditor.vue'));
+const TerminalPane = defineAsyncComponent(() => import('@/terminal/TerminalPane.vue'));
 
 interface DesktopWindow {
   id: string;
@@ -663,10 +686,11 @@ const desktopRating = ref(props.initialRating);
 const ratingOptions = [1, 2, 3, 4, 5];
 const nextBrowserTabId = ref(3);
 const browserTabs = ref<BrowserTab[]>([
-  { id: 1, title: 'Uiverse', url: 'uiverse.io' },
-  { id: 2, title: 'Rafex', url: 'rafex.dev' },
+  { id: 1, title: 'Rafex', url: 'rafex.dev' },
+  { id: 2, title: 'DuckDuckGo', url: 'duckduckgo.com' },
 ]);
 const activeBrowserTabId = ref(1);
+const browserAddressDraft = ref('rafex.dev');
 const profileDraft = ref({
   name: props.userName,
   email: props.userEmail,
@@ -728,6 +752,19 @@ const toastNotifications = computed(() => notifications.value.filter((item) => i
 const activeBrowserTab = computed(() => {
   return browserTabs.value.find((tab) => tab.id === activeBrowserTabId.value) ?? browserTabs.value[0] ?? null;
 });
+const activeBrowserSrc = computed(() => {
+  const url = activeBrowserTab.value?.url ?? '';
+  return resolveAllowedBrowserUrl(url);
+});
+const activeBrowserMessage = computed(() => {
+  const url = activeBrowserTab.value?.url ?? '';
+
+  if (!url.trim()) {
+    return 'Ingresa una URL permitida para navegar.';
+  }
+
+  return 'Esta URL no esta permitida dentro del navegador de EtherDesk.';
+});
 const groupedRecentNotifications = computed(() => {
   const recent = notifications.value.slice(0, 7);
   const grouped = new Map<string, { id: string; kind: DesktopNotification['kind']; sourceLabel: string; title: string; description: string; count: number; createdAt: string }>();
@@ -781,6 +818,14 @@ watch(
   ([name, email]) => {
     profileDraft.value = { name, email };
   },
+);
+
+watch(
+  activeBrowserTab,
+  (tab) => {
+    browserAddressDraft.value = tab?.url ?? '';
+  },
+  { immediate: true },
 );
 
 watch(
@@ -1195,8 +1240,8 @@ function addBrowserTab() {
   const id = nextBrowserTabId.value++;
   browserTabs.value.push({
     id,
-    title: `Tab ${id}`,
-    url: 'new-tab.local',
+    title: 'Rafex',
+    url: 'rafex.dev',
   });
   activeBrowserTabId.value = id;
 }
@@ -1205,8 +1250,8 @@ function closeBrowserTab(tabId: number) {
   if (browserTabs.value.length === 1) {
     browserTabs.value[0] = {
       id: browserTabs.value[0].id,
-      title: 'New Tab',
-      url: 'new-tab.local',
+      title: 'Rafex',
+      url: 'rafex.dev',
     };
     activeBrowserTabId.value = browserTabs.value[0].id;
     return;
@@ -1219,16 +1264,33 @@ function closeBrowserTab(tabId: number) {
   }
 }
 
-function updateBrowserUrl(event: Event) {
-  const target = event.target as HTMLInputElement;
+function navigateBrowser() {
   const currentTab = activeBrowserTab.value;
 
   if (!currentTab) {
     return;
   }
 
-  currentTab.url = target.value;
-  currentTab.title = deriveBrowserTitle(target.value);
+  const nextUrl = browserAddressDraft.value.trim();
+  const resolvedUrl = resolveAllowedBrowserUrl(nextUrl);
+
+  currentTab.url = nextUrl;
+  currentTab.title = deriveBrowserTitle(nextUrl);
+
+  if (!resolvedUrl) {
+    notify('Navegacion bloqueada', 'El navegador solo permite rafex.dev y duckduckgo.com.', {
+      kind: 'warning',
+      sourceId: 'browser',
+      sourceLabel: 'Browser',
+    });
+    return;
+  }
+
+  notify('Browser', `Cargando ${currentTab.title}.`, {
+    kind: 'info',
+    sourceId: 'browser',
+    sourceLabel: 'Browser',
+  });
 }
 
 function deriveBrowserTitle(url: string) {
@@ -1243,6 +1305,29 @@ function deriveBrowserTitle(url: string) {
     .split('.')[0];
 
   return hostname ? hostname.charAt(0).toUpperCase() + hostname.slice(1) : 'New Tab';
+}
+
+function resolveAllowedBrowserUrl(url: string) {
+  const normalized = url.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const withProtocol = /^https?:\/\//i.test(normalized) ? normalized : `https://${normalized}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    const isAllowed = hostname === 'rafex.dev' || hostname === 'duckduckgo.com';
+
+    if (!isAllowed) {
+      return null;
+    }
+
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 function notify(

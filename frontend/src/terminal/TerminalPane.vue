@@ -1,5 +1,10 @@
 <template>
-  <div ref="hostRef" class="terminal-pane"></div>
+  <div class="terminal-pane">
+    <div ref="hostRef" class="terminal-pane__surface"></div>
+    <footer class="terminal-pane__status">
+      <span>{{ statusLabel }}</span>
+    </footer>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -7,6 +12,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import { addOfflineSyncCompleteListener, queueOfflineAction, readTerminalSnapshot, requestOfflineSync, saveTerminalSnapshot } from '@/os/offline';
 
 const props = defineProps<{
   userName: string;
@@ -15,11 +21,15 @@ const props = defineProps<{
 }>();
 
 const hostRef = ref<HTMLDivElement | null>(null);
+const statusLabel = ref('Cargando terminal...');
 
 let term: Terminal | null = null;
 let fitAddon: FitAddon | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let commandBuffer = '';
+let logLines: string[] = [];
+let commandHistory: string[] = [];
+let removeSyncCompleteListener: (() => void) | null = null;
 
 function terminalTheme(themeMode: 'ocean' | 'sand') {
   if (themeMode === 'sand') {
@@ -59,13 +69,49 @@ function printPrompt() {
   term?.write(`\r\n${promptLabel()}`);
 }
 
+function writeLine(line: string) {
+  logLines.push(line);
+  term?.writeln(line);
+}
+
+function persistTerminalSnapshot() {
+  const snapshot = saveTerminalSnapshot({
+    history: commandHistory,
+    log: logLines,
+  });
+
+  queueOfflineAction({
+    type: 'terminal.sync',
+    payload: snapshot,
+  });
+
+  statusLabel.value = navigator.onLine ? 'Sesion guardada localmente. Sincronizando...' : 'Offline: sesion guardada localmente';
+  if (navigator.onLine) {
+    requestOfflineSync();
+  }
+}
+
+function syncStatusFromSnapshot() {
+  const snapshot = readTerminalSnapshot();
+  if (!snapshot) {
+    statusLabel.value = navigator.onLine ? 'Terminal lista' : 'Offline: terminal local activa';
+    return;
+  }
+
+  statusLabel.value = snapshot.syncedAt
+    ? `Sincronizado ${new Date(snapshot.syncedAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`
+    : navigator.onLine
+      ? 'Sesion restaurada. Pendiente de sincronizar'
+      : 'Offline: sesion restaurada localmente';
+}
+
 function writeIntro() {
   if (!term) {
     return;
   }
 
-  term.writeln('EtherDesk Terminal');
-  term.writeln('Comandos permitidos: help, clear, date, whoami, apps, theme');
+  writeLine('EtherDesk Terminal');
+  writeLine('Comandos permitidos: help, clear, date, whoami, apps, theme');
   term.write(promptLabel());
 }
 
@@ -75,45 +121,60 @@ function runCommand(rawCommand: string) {
   }
 
   const command = rawCommand.trim().toLowerCase();
+  const promptEntry = `${promptLabel()}${rawCommand}`;
+
+  if (rawCommand !== '') {
+    logLines.push(promptEntry);
+    commandHistory.push(rawCommand);
+  }
 
   switch (command) {
     case '':
       printPrompt();
       break;
     case 'help':
-      term.writeln('\r\nhelp   lista comandos');
-      term.writeln('clear  limpia la terminal');
-      term.writeln('date   fecha local');
-      term.writeln('whoami usuario actual');
-      term.writeln('apps   aplicaciones disponibles');
-      term.writeln('theme  tema visual actual');
+      writeLine('');
+      writeLine('help   lista comandos');
+      writeLine('clear  limpia la terminal');
+      writeLine('date   fecha local');
+      writeLine('whoami usuario actual');
+      writeLine('apps   aplicaciones disponibles');
+      writeLine('theme  tema visual actual');
       printPrompt();
       break;
     case 'clear':
       term.clear();
+      logLines = [];
       term.write(promptLabel());
       break;
     case 'date':
-      term.writeln(`\r\n${new Date().toLocaleString('es-MX')}`);
+      writeLine('');
+      writeLine(new Date().toLocaleString('es-MX'));
       printPrompt();
       break;
     case 'whoami':
-      term.writeln(`\r\n${props.userName}`);
+      writeLine('');
+      writeLine(props.userName);
       printPrompt();
       break;
     case 'apps':
-      term.writeln(`\r\n${props.apps.join(', ')}`);
+      writeLine('');
+      writeLine(props.apps.join(', '));
       printPrompt();
       break;
     case 'theme':
-      term.writeln(`\r\n${props.themeMode}`);
+      writeLine('');
+      writeLine(props.themeMode);
       printPrompt();
       break;
     default:
-      term.writeln(`\r\nComando no permitido: ${rawCommand}`);
+      writeLine('');
+      writeLine(`Comando no permitido: ${rawCommand}`);
       printPrompt();
       break;
   }
+
+  persistTerminalSnapshot();
 }
 
 function bindInput() {
@@ -165,7 +226,22 @@ onMounted(() => {
   term.open(hostRef.value);
   fitAddon.fit();
   bindInput();
-  writeIntro();
+
+  const storedSnapshot = readTerminalSnapshot();
+  if (storedSnapshot && storedSnapshot.log.length > 0) {
+    logLines = [...storedSnapshot.log];
+    commandHistory = [...storedSnapshot.history];
+    storedSnapshot.log.forEach((line) => term?.writeln(line));
+    term.write(promptLabel());
+    syncStatusFromSnapshot();
+  } else {
+    writeIntro();
+    statusLabel.value = navigator.onLine ? 'Terminal lista' : 'Offline: terminal local activa';
+  }
+
+  removeSyncCompleteListener = addOfflineSyncCompleteListener(() => {
+    syncStatusFromSnapshot();
+  });
 
   resizeObserver = new ResizeObserver(() => {
     fitAddon?.fit();
@@ -184,6 +260,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  removeSyncCompleteListener?.();
   resizeObserver?.disconnect();
   term?.dispose();
 });
@@ -194,7 +271,24 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.terminal-pane__surface {
+  min-height: 0;
   padding: 10px;
+}
+
+.terminal-pane__status {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(233, 239, 255, 0.66);
+  font-size: 0.76rem;
+  background: rgba(8, 13, 22, 0.48);
 }
 
 :deep(.xterm) {

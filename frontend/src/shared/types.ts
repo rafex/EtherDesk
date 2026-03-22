@@ -25,6 +25,36 @@ export interface DesktopKernelState {
   preferences: {
     satisfaction: number;
   };
+  workspace?: {
+    notes?: {
+      content: string;
+      updatedAt: string;
+    } | null;
+    terminal?: {
+      history: string[];
+      log: string[];
+      updatedAt: string;
+    } | null;
+  };
+}
+
+export interface NotesDraftSnapshot {
+  content: string;
+  updatedAt: string;
+  syncedAt?: string | null;
+}
+
+export interface TerminalSessionSnapshot {
+  history: string[];
+  log: string[];
+  updatedAt: string;
+  syncedAt?: string | null;
+}
+
+export interface FeedbackSubmission {
+  rating: number;
+  chips: string[];
+  comment: string;
 }
 
 export interface ServiceAlert {

@@ -1,4 +1,4 @@
-import type { DesktopKernelState, SessionUser } from '@/shared/types';
+import type { DesktopKernelState, FeedbackSubmission, NotesDraftSnapshot, SessionUser, TerminalSessionSnapshot } from '@/shared/types';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
@@ -51,10 +51,22 @@ export function createEtherDeskKernel(getToken: () => string | null) {
         method: 'GET',
       });
     },
-    submitSatisfaction(rating: number) {
+    submitSatisfaction(feedback: FeedbackSubmission) {
       return request<{ rating: number }>('/api/os/feedback', {
         method: 'POST',
-        body: JSON.stringify({ rating }),
+        body: JSON.stringify(feedback),
+      });
+    },
+    syncNotes(snapshot: NotesDraftSnapshot) {
+      return request<{ updatedAt: string }>('/api/os/notes/sync', {
+        method: 'POST',
+        body: JSON.stringify(snapshot),
+      });
+    },
+    syncTerminal(snapshot: TerminalSessionSnapshot) {
+      return request<{ updatedAt: string }>('/api/os/terminal/sync', {
+        method: 'POST',
+        body: JSON.stringify(snapshot),
       });
     },
     logout() {

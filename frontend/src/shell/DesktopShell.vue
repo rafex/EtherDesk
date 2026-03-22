@@ -131,19 +131,41 @@
       </div>
 
       <div class="desktop-launcher__results">
-        <button
-          v-for="app in filteredApps"
-          :key="app.id"
-          class="desktop-launcher__result"
-          type="button"
-          @click="launchFromLauncher(app.id)"
-        >
-          <span class="desktop-launcher__result-icon">{{ app.icon }}</span>
-          <span class="desktop-launcher__result-copy">
-            <strong>{{ app.name }}</strong>
-            <span>{{ app.description }}</span>
-          </span>
-        </button>
+        <div class="desktop-launcher__summary">
+          <div>
+            <strong>{{ launcherTime }}</strong>
+            <span>{{ launcherDate }}</span>
+          </div>
+          <button class="desktop-launcher__logout" type="button" @click="$emit('logout')">
+            Cerrar sesion
+          </button>
+        </div>
+
+        <div class="desktop-launcher__profile">
+          <img class="desktop-launcher__avatar" :src="userAvatarUrl" :alt="profileDraft.name" />
+          <div class="desktop-launcher__profile-copy">
+            <strong>{{ profileDraft.name }}</strong>
+            <span>{{ profileDraft.email }}</span>
+          </div>
+        </div>
+
+        <div class="desktop-launcher__apps">
+          <button
+            v-for="app in filteredApps"
+            :key="app.id"
+            class="desktop-launcher__result"
+            type="button"
+            @click="launchFromLauncher(app.id)"
+          >
+            <span class="desktop-launcher__result-icon">
+              <AppIcon :icon="app.icon" :label="app.name" />
+            </span>
+            <span class="desktop-launcher__result-copy">
+              <strong>{{ app.name }}</strong>
+              <span>{{ app.description }}</span>
+            </span>
+          </button>
+        </div>
 
         <p v-if="filteredApps.length === 0" class="desktop-launcher__empty">
           No hay resultados para "{{ launcherQuery }}".
@@ -383,6 +405,23 @@
                   </button>
                 </div>
               </div>
+
+              <div class="desktop-settings__group">
+                <span class="desktop-settings__label">Tamano por defecto de ventanas</span>
+                <label class="desktop-settings__field">
+                  <span>Ancho (px)</span>
+                  <input v-model.number="windowDefaultsDraft.width" type="number" :min="MIN_WINDOW_WIDTH" step="10" />
+                </label>
+                <label class="desktop-settings__field">
+                  <span>Alto (px)</span>
+                  <input v-model.number="windowDefaultsDraft.height" type="number" :min="MIN_WINDOW_HEIGHT" step="10" />
+                </label>
+                <div class="desktop-settings__actions">
+                  <button class="desktop-settings__save" type="button" @click="saveWindowDefaults">
+                    Guardar tamano por defecto
+                  </button>
+                </div>
+              </div>
             </section>
 
             <section class="desktop-settings__section">
@@ -404,6 +443,14 @@
               <div class="desktop-settings__actions">
                 <button class="desktop-settings__save" type="button" @click="saveProfileSettings">
                   Guardar cambios
+                </button>
+                <button
+                  class="desktop-settings__reset"
+                  type="button"
+                  :disabled="isResettingAppData"
+                  @click="resetAppData"
+                >
+                  {{ isResettingAppData ? 'Reiniciando...' : 'Reiniciar datos y config' }}
                 </button>
               </div>
             </section>
@@ -462,6 +509,102 @@
             </div>
           </div>
 
+          <div v-else-if="windowItem.appId === 'files'" class="desktop-files">
+            <div class="desktop-files__header">
+              <p class="desktop-window__eyebrow">Workspace</p>
+              <h2>Archivos locales</h2>
+            </div>
+            <div class="desktop-files__list">
+              <article
+                v-for="file in fileEntries"
+                :key="file.id"
+                class="desktop-files__item"
+                :class="{ 'desktop-files__item--muted': !file.exists }"
+              >
+                <div class="desktop-files__item-main">
+                  <AppIcon :icon="file.type" :label="file.name" />
+                  <div>
+                    <strong>{{ file.name }}</strong>
+                    <span>{{ file.exists ? `Actualizado ${formatNotificationTime(file.updatedAt)}` : 'Sin contenido local todavia' }}</span>
+                  </div>
+                </div>
+                <div class="desktop-files__actions">
+                  <button type="button" :disabled="!file.exists" @click="openLocalFile(file.id)">Abrir</button>
+                  <button type="button" @click="renameLocalFile(file.id)">Renombrar</button>
+                  <button type="button" :disabled="!file.exists" @click="deleteLocalFile(file.id)">Borrar</button>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div v-else-if="windowItem.appId === 'system-monitor'" class="desktop-monitor">
+            <div class="desktop-monitor__grid">
+              <article class="desktop-monitor__card">
+                <span>Red</span>
+                <strong>{{ isOnline ? 'Online' : 'Offline' }}</strong>
+              </article>
+              <article class="desktop-monitor__card">
+                <span>Sincronizaciones pendientes</span>
+                <strong>{{ pendingTaskGroups.reduce((total, item) => total + item.count, 0) }}</strong>
+              </article>
+              <article class="desktop-monitor__card">
+                <span>Kernel</span>
+                <strong>etherdesk-kernel {{ props.osVersion }}</strong>
+              </article>
+              <article class="desktop-monitor__card">
+                <span>Sesion</span>
+                <strong>{{ profileDraft.email }}</strong>
+              </article>
+              <article class="desktop-monitor__card">
+                <span>Service Worker</span>
+                <strong>{{ serviceWorkerStatus }}</strong>
+              </article>
+              <article class="desktop-monitor__card">
+                <span>PWA</span>
+                <strong>{{ displayModeLabel }}</strong>
+              </article>
+            </div>
+          </div>
+
+          <div v-else-if="windowItem.appId === 'account'" class="desktop-account">
+            <p class="desktop-window__eyebrow">Profile</p>
+            <div class="desktop-account__hero">
+              <img class="desktop-account__avatar" :src="userAvatarUrl" :alt="profileDraft.name" />
+              <div>
+                <h2>{{ profileDraft.name }}</h2>
+                <p>{{ profileDraft.email }}</p>
+                <p>EtherDesk OS {{ props.osVersion }}</p>
+              </div>
+            </div>
+            <div class="desktop-account__actions">
+              <button type="button" @click="$emit('logout')">Cerrar sesion</button>
+            </div>
+          </div>
+
+          <div v-else-if="windowItem.appId === 'tasks'" class="desktop-tasks">
+            <p class="desktop-window__eyebrow">Queue</p>
+            <h2>Tareas pendientes</h2>
+            <div class="desktop-tasks__list">
+              <article v-for="task in pendingTaskGroups" :key="task.type" class="desktop-tasks__item">
+                <strong>{{ task.type }}</strong>
+                <span>{{ task.count }} pendiente(s)</span>
+              </article>
+              <p v-if="pendingTaskGroups.length === 0" class="desktop-tasks__empty">No hay trabajos pendientes por sincronizar.</p>
+            </div>
+          </div>
+
+          <div v-else-if="windowItem.appId === 'help'" class="desktop-help">
+            <p class="desktop-window__eyebrow">Guide</p>
+            <h2>Ayuda rapida</h2>
+            <ul class="desktop-help__list">
+              <li>`Cmd/Ctrl + K` abre el launcher</li>
+              <li>El browser solo permite `rafex.dev` y `duckduckgo.com`</li>
+              <li>Notes y Terminal guardan localmente si estas offline</li>
+              <li>Las tareas pendientes se ven en `Tasks`</li>
+              <li>Usa `Settings` para resetear datos de la PWA</li>
+            </ul>
+          </div>
+
           <div v-else class="desktop-window__editor-card">
             <div class="desktop-window__editor-meta">
               <p class="desktop-window__eyebrow">{{ windowItem.appName }}</p>
@@ -502,7 +645,9 @@
           @click.stop="restoreWindow(windowItem.id)"
         >
           <span class="desktop-minimized-dock__filled"></span>
-          <span class="desktop-minimized-dock__icon">{{ windowIcon(windowItem) }}</span>
+          <span class="desktop-minimized-dock__icon">
+            <AppIcon :icon="windowIcon(windowItem)" :label="windowItem.appName" />
+          </span>
         </button>
         <div class="desktop-minimized-dock__tooltip">{{ windowItem.title }}</div>
       </li>
@@ -555,12 +700,17 @@
       </article>
     </section>
 
+    <div class="desktop-version">
+      <span>EtherDesk OS</span>
+      <strong>{{ props.osVersion }}</strong>
+    </div>
+
     <div class="desktop-rating" aria-label="Calificacion del sistema">
       <button
         v-for="value in ratingOptions"
         :key="value"
         class="desktop-rating__button"
-        :class="{ 'desktop-rating__button--active': value <= desktopRating }"
+        :class="{ 'desktop-rating__button--active': value <= activeRatingValue }"
         type="button"
         :aria-label="`${value} estrella${value === 1 ? '' : 's'}`"
         @click="setDesktopRating(value)"
@@ -568,6 +718,40 @@
         ★
       </button>
     </div>
+
+    <section v-if="feedbackDialog.visible" class="desktop-feedback" @click.self="closeFeedbackDialog">
+      <div class="desktop-feedback__panel">
+        <p class="desktop-window__eyebrow">Feedback</p>
+        <h2>{{ feedbackDialog.rating }}/5 estrellas</h2>
+        <p>
+          {{ feedbackDialog.rating <= 2 ? 'Cuentanos que no funciono bien.' : feedbackDialog.rating === 3 ? 'Que te parecio regular o mejorable?' : 'Que fue lo que mas te gusto?' }}
+        </p>
+
+        <div class="desktop-feedback__chips">
+          <button
+            v-for="chip in feedbackChipOptions"
+            :key="chip"
+            class="desktop-feedback__chip"
+            :class="{ 'desktop-feedback__chip--active': feedbackDialog.selectedChips.includes(chip) }"
+            type="button"
+            @click="toggleFeedbackChip(chip)"
+          >
+            {{ chip }}
+          </button>
+        </div>
+
+        <textarea
+          v-model="feedbackDialog.comment"
+          class="desktop-feedback__textarea"
+          placeholder="Agrega mas contexto sobre tu experiencia..."
+        ></textarea>
+
+        <div class="desktop-feedback__actions">
+          <button type="button" @click="closeFeedbackDialog">Cancelar</button>
+          <button type="button" @click="submitFeedback">Enviar feedback</button>
+        </div>
+      </div>
+    </section>
 
     <div
       v-if="contextMenu.visible"
@@ -586,8 +770,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import type { AppShortcut, ServiceAlert } from '@/shared/types';
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import AppIcon from '@/shared/AppIcon.vue';
+import { addOfflineStateListener, readNotesDraft, readOfflineQueue, readTerminalSnapshot } from '@/os/offline';
+import type { AppShortcut, FeedbackSubmission, ServiceAlert } from '@/shared/types';
 
 const NotesEditor = defineAsyncComponent(() => import('@/editor/NotesEditor.vue'));
 const TerminalPane = defineAsyncComponent(() => import('@/terminal/TerminalPane.vue'));
@@ -635,6 +821,21 @@ interface ChatMessage {
   time: string;
 }
 
+interface FeedbackDialogState {
+  visible: boolean;
+  rating: number;
+  comment: string;
+  selectedChips: string[];
+}
+
+interface LocalFileItem {
+  id: string;
+  name: string;
+  type: 'notes' | 'terminal';
+  updatedAt: string;
+  exists: boolean;
+}
+
 type ResizeDirection = 'right' | 'bottom' | 'corner';
 
 interface BrowserTab {
@@ -651,18 +852,20 @@ const MAXIMIZED_MARGIN = 18;
 const MAXIMIZED_TOP_OFFSET = 43;
 const MIN_WINDOW_WIDTH = 320;
 const MIN_WINDOW_HEIGHT = 220;
+const WINDOW_DEFAULTS_STORAGE_KEY = 'etherdesk.settings.window-defaults';
 
 const props = defineProps<{
   apps: AppShortcut[];
   userName: string;
   userEmail: string;
   initialRating: number;
+  osVersion: string;
   serviceAlerts: ServiceAlert[];
 }>();
 
 const emit = defineEmits<{
   logout: [];
-  rate: [value: number];
+  rate: [feedback: FeedbackSubmission];
   'consume-service-alert': [alertId: number];
 }>();
 
@@ -683,6 +886,12 @@ const wallpaperVariant = ref<WallpaperVariant>('ocean');
 const isLauncherOpen = ref(false);
 const launcherQuery = ref('');
 const desktopRating = ref(props.initialRating);
+const feedbackDialog = ref<FeedbackDialogState>({
+  visible: false,
+  rating: 0,
+  comment: '',
+  selectedChips: [],
+});
 const ratingOptions = [1, 2, 3, 4, 5];
 const nextBrowserTabId = ref(3);
 const browserTabs = ref<BrowserTab[]>([
@@ -695,13 +904,18 @@ const profileDraft = ref({
   name: props.userName,
   email: props.userEmail,
 });
+const windowDefaultsDraft = ref(readStoredWindowDefaults());
 const wallpaperOptions: Array<{ id: WallpaperVariant; label: string }> = [
   { id: 'ocean', label: 'Oceano' },
   { id: 'sunset', label: 'Sunset' },
   { id: 'graphite', label: 'Graphite' },
 ];
+const launcherTime = ref('');
+const launcherDate = ref('');
 const nextChatMessageId = ref(5);
 const chatDraft = ref('');
+const isResettingAppData = ref(false);
+const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true);
 const chatMessages = ref<ChatMessage[]>([
   {
     id: 1,
@@ -745,6 +959,8 @@ const windows = ref<DesktopWindow[]>([
     isMaximized: false,
   },
 ]);
+const fileEntries = ref<LocalFileItem[]>([]);
+const offlineStateTick = ref(0);
 
 const visibleWindows = computed(() => windows.value.filter((windowItem) => !windowItem.isMinimized));
 const minimizedWindows = computed(() => windows.value.filter((windowItem) => windowItem.isMinimized));
@@ -805,6 +1021,45 @@ const filteredApps = computed(() => {
     return `${app.name} ${app.description}`.toLowerCase().includes(normalizedQuery);
   });
 });
+const activeRatingValue = computed(() => (feedbackDialog.value.visible ? feedbackDialog.value.rating : desktopRating.value));
+const feedbackChipOptions = computed(() => {
+  const rating = feedbackDialog.value.rating;
+
+  if (rating <= 2) {
+    return ['lento', 'no abre', 'confuso', 'fallo offline', 'errores visuales'];
+  }
+
+  if (rating === 3) {
+    return ['estable', 'puede mejorar', 'faltan apps', 'regular offline', 'visual aceptable'];
+  }
+
+  return ['excelente aplicacion', 'increible experiencia de usuario', 'rapido', 'flujo claro', 'muy util offline'];
+});
+const pendingTaskGroups = computed(() => {
+  offlineStateTick.value;
+  const queue = readOfflineQueue();
+  const groups = new Map<string, number>();
+
+  queue.forEach((item) => {
+    groups.set(item.type, (groups.get(item.type) ?? 0) + 1);
+  });
+
+  return Array.from(groups.entries()).map(([type, count]) => ({
+    type,
+    count,
+  }));
+});
+const serviceWorkerStatus = ref('checking');
+const displayModeLabel = ref('browser');
+const userInitials = computed(() => {
+  return profileDraft.value.name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((fragment) => fragment.charAt(0).toUpperCase())
+    .join('');
+});
+const userAvatarUrl = computed(() => buildAvatarDataUrl(profileDraft.value.name, userInitials.value));
 
 watch(
   () => props.initialRating,
@@ -886,6 +1141,209 @@ let resizeState:
       startHeight: number;
     }
   | null = null;
+let clockTimer: number | null = null;
+let removeOnlineListener: (() => void) | null = null;
+let removeOfflineListener: (() => void) | null = null;
+let removeOfflineStateListener: (() => void) | null = null;
+
+function syncLauncherClock() {
+  const now = new Date();
+  launcherTime.value = new Intl.DateTimeFormat('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(now);
+  launcherDate.value = new Intl.DateTimeFormat('es-MX', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(now);
+}
+
+function refreshLocalWorkspace() {
+  const notesDraft = readNotesDraft();
+  const terminalSnapshot = readTerminalSnapshot();
+
+  fileEntries.value = [
+    {
+      id: 'notes-file',
+      name: 'notes.md',
+      type: 'notes',
+      updatedAt: notesDraft?.updatedAt ?? '',
+      exists: Boolean(notesDraft),
+    },
+    {
+      id: 'terminal-file',
+      name: 'terminal-session.log',
+      type: 'terminal',
+      updatedAt: terminalSnapshot?.updatedAt ?? '',
+      exists: Boolean(terminalSnapshot),
+    },
+  ];
+}
+
+function updateConnectionStatus() {
+  isOnline.value = navigator.onLine;
+}
+
+async function updateServiceWorkerStatus() {
+  if (!('serviceWorker' in navigator)) {
+    serviceWorkerStatus.value = 'unsupported';
+    return;
+  }
+
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  serviceWorkerStatus.value = registrations.length > 0 ? 'active' : 'missing';
+}
+
+function updateDisplayMode() {
+  displayModeLabel.value = window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser';
+}
+
+function openFeedbackDialog(value: number) {
+  feedbackDialog.value = {
+    visible: true,
+    rating: value,
+    comment: '',
+    selectedChips: [],
+  };
+}
+
+function toggleFeedbackChip(chip: string) {
+  const hasChip = feedbackDialog.value.selectedChips.includes(chip);
+  feedbackDialog.value.selectedChips = hasChip
+    ? feedbackDialog.value.selectedChips.filter((item) => item !== chip)
+    : [...feedbackDialog.value.selectedChips, chip];
+}
+
+function closeFeedbackDialog() {
+  feedbackDialog.value.visible = false;
+}
+
+function submitFeedback() {
+  const submission: FeedbackSubmission = {
+    rating: feedbackDialog.value.rating,
+    chips: [...feedbackDialog.value.selectedChips],
+    comment: feedbackDialog.value.comment.trim(),
+  };
+
+  desktopRating.value = submission.rating;
+  emit('rate', submission);
+  closeFeedbackDialog();
+
+  notify(
+    'Satisfaccion registrada',
+    submission.comment
+      ? `Calificacion ${submission.rating}/5 registrada con comentario.`
+      : `Calificacion actual: ${submission.rating} de 5 estrellas.`,
+    {
+      kind: 'success',
+      sourceId: 'os.feedback',
+      sourceLabel: 'Feedback',
+    },
+  );
+}
+
+function renameLocalFile(fileId: string) {
+  const file = fileEntries.value.find((item) => item.id === fileId);
+  if (!file) {
+    return;
+  }
+
+  const nextName = window.prompt('Nuevo nombre del archivo', file.name)?.trim();
+  if (!nextName) {
+    return;
+  }
+
+  file.name = nextName;
+  notify('Archivo renombrado', `${nextName} actualizado localmente.`, {
+    kind: 'success',
+    sourceId: 'files',
+    sourceLabel: 'Files',
+  });
+}
+
+function deleteLocalFile(fileId: string) {
+  const file = fileEntries.value.find((item) => item.id === fileId);
+  if (!file) {
+    return;
+  }
+
+  if (file.type === 'notes') {
+    window.localStorage.removeItem('etherdesk.notes.draft');
+  } else if (file.type === 'terminal') {
+    window.localStorage.removeItem('etherdesk.terminal.snapshot');
+  }
+
+  refreshLocalWorkspace();
+  notify('Archivo eliminado', `${file.name} fue eliminado del almacenamiento local.`, {
+    kind: 'info',
+    sourceId: 'files',
+    sourceLabel: 'Files',
+  });
+}
+
+function openLocalFile(fileId: string) {
+  const file = fileEntries.value.find((item) => item.id === fileId);
+  if (!file) {
+    return;
+  }
+
+  openAppWindow(file.type === 'notes' ? 'notes' : 'terminal');
+}
+
+function buildAvatarDataUrl(name: string, initials: string) {
+  const normalizedName = name.trim() || 'EtherDesk';
+  const seed = normalizedName.split('').reduce((accumulator, character) => accumulator + character.charCodeAt(0), 0);
+  const firstHue = seed % 360;
+  const secondHue = (seed + 48) % 360;
+  const safeInitials = initials || 'ED';
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="${normalizedName}">
+      <defs>
+        <linearGradient id="avatar-gradient" x1="0%" x2="100%" y1="0%" y2="100%">
+          <stop offset="0%" stop-color="hsl(${firstHue} 78% 64%)" />
+          <stop offset="100%" stop-color="hsl(${secondHue} 68% 48%)" />
+        </linearGradient>
+      </defs>
+      <rect width="96" height="96" rx="24" fill="url(#avatar-gradient)" />
+      <circle cx="48" cy="36" r="14" fill="rgba(255,255,255,0.24)" />
+      <path d="M22 79c4-14 15-22 26-22s22 8 26 22" fill="rgba(255,255,255,0.2)" />
+      <text x="48" y="55" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="white">${safeInitials}</text>
+    </svg>
+  `.trim();
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function readStoredWindowDefaults() {
+  if (typeof window === 'undefined') {
+    return {
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT,
+    };
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(WINDOW_DEFAULTS_STORAGE_KEY);
+    if (!rawValue) {
+      return {
+        width: WINDOW_WIDTH,
+        height: WINDOW_HEIGHT,
+      };
+    }
+
+    const parsed = JSON.parse(rawValue) as { width?: number; height?: number };
+    return {
+      width: Math.max(MIN_WINDOW_WIDTH, Number(parsed.width ?? WINDOW_WIDTH)),
+      height: Math.max(MIN_WINDOW_HEIGHT, Number(parsed.height ?? WINDOW_HEIGHT)),
+    };
+  } catch {
+    return {
+      width: WINDOW_WIDTH,
+      height: WINDOW_HEIGHT,
+    };
+  }
+}
 
 function nextZIndex() {
   highestZIndex.value += 1;
@@ -913,8 +1371,8 @@ function buildWindow(app: AppShortcut): DesktopWindow {
     description: app.description,
     x: 88 + offset,
     y: 88 + offset,
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
+    width: windowDefaultsDraft.value.width,
+    height: windowDefaultsDraft.value.height,
     zIndex: nextZIndex(),
     isMinimized: false,
     isMaximized: false,
@@ -942,8 +1400,8 @@ function buildSpecialWindow(config: {
     description: config.description,
     x: 92 + offset,
     y: 84 + offset,
-    width: config.width ?? WINDOW_WIDTH,
-    height: config.height ?? WINDOW_HEIGHT,
+    width: config.width ?? windowDefaultsDraft.value.width,
+    height: config.height ?? windowDefaultsDraft.value.height,
     zIndex: nextZIndex(),
     isMinimized: false,
     isMaximized: false,
@@ -1098,10 +1556,11 @@ function isAppOpen(appId: string) {
 
 function windowIcon(windowItem: DesktopWindow) {
   if (windowItem.appId === 'system') {
-    return 'O';
+    return 'system';
   }
 
-  return props.apps.find((app) => app.id === windowItem.appId)?.icon ?? windowItem.appName.charAt(0).toUpperCase();
+  const app = props.apps.find((item) => item.id === windowItem.appId);
+  return app?.icon ?? 'system';
 }
 
 function openContextMenu(event: MouseEvent) {
@@ -1368,13 +1827,7 @@ function dismissNotification(notificationId: number) {
 }
 
 function setDesktopRating(value: number) {
-  desktopRating.value = value;
-  emit('rate', value);
-  notify('Satisfaccion registrada', `Calificacion actual: ${value} de 5 estrellas.`, {
-    kind: 'success',
-    sourceId: 'os.feedback',
-    sourceLabel: 'Feedback',
-  });
+  openFeedbackDialog(value);
 }
 
 function handleThemeToggle() {
@@ -1436,6 +1889,102 @@ function saveProfileSettings() {
     sourceId: 'settings',
     sourceLabel: 'Settings',
   });
+}
+
+function saveWindowDefaults() {
+  const normalizedWidth = Math.max(MIN_WINDOW_WIDTH, Number(windowDefaultsDraft.value.width || WINDOW_WIDTH));
+  const normalizedHeight = Math.max(MIN_WINDOW_HEIGHT, Number(windowDefaultsDraft.value.height || WINDOW_HEIGHT));
+
+  windowDefaultsDraft.value = {
+    width: normalizedWidth,
+    height: normalizedHeight,
+  };
+
+  window.localStorage.setItem(
+    WINDOW_DEFAULTS_STORAGE_KEY,
+    JSON.stringify({
+      width: normalizedWidth,
+      height: normalizedHeight,
+    }),
+  );
+
+  notify('Ventanas actualizadas', `Tamano por defecto: ${normalizedWidth}px x ${normalizedHeight}px.`, {
+    kind: 'success',
+    sourceId: 'settings',
+    sourceLabel: 'Settings',
+  });
+}
+
+async function resetAppData() {
+  const confirmation = window.confirm(
+    'Se limpiaran los datos locales, configuracion persistida y cache de la PWA. La aplicacion se recargara. Deseas continuar?',
+  );
+
+  if (!confirmation) {
+    return;
+  }
+
+  isResettingAppData.value = true;
+
+  try {
+    if (typeof window !== 'undefined') {
+      Object.keys(window.localStorage).forEach((key) => {
+        if (key.startsWith('etherdesk.') || key.startsWith('vite')) {
+          window.localStorage.removeItem(key);
+        }
+      });
+      window.sessionStorage.clear();
+    }
+
+    if ('caches' in window) {
+      const cacheKeys = await window.caches.keys();
+      await Promise.all(cacheKeys.map((key) => window.caches.delete(key)));
+    }
+
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+
+    if ('indexedDB' in window) {
+      const indexedDbWithDatabases = window.indexedDB as IDBFactory & {
+        databases?: () => Promise<Array<{ name?: string }>>;
+      };
+
+      if (indexedDbWithDatabases.databases) {
+        const databases = await indexedDbWithDatabases.databases();
+        await Promise.all(
+          databases
+            .filter((database) => Boolean(database.name))
+            .map(
+              (database) =>
+                new Promise<void>((resolve) => {
+                  const request = window.indexedDB.deleteDatabase(database.name as string);
+                  request.onsuccess = () => resolve();
+                  request.onerror = () => resolve();
+                  request.onblocked = () => resolve();
+                }),
+            ),
+        );
+      }
+    }
+
+    emit('logout');
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 120);
+  } catch (error) {
+    isResettingAppData.value = false;
+    notify(
+      'No fue posible reiniciar la PWA',
+      error instanceof Error ? error.message : 'Ocurrio un error inesperado durante la limpieza local.',
+      {
+        kind: 'error',
+        sourceId: 'settings',
+        sourceLabel: 'Settings',
+      },
+    );
+  }
 }
 
 function notifyNotificationCenter() {
@@ -1564,10 +2113,41 @@ window.addEventListener('mouseup', stopResize);
 window.addEventListener('keydown', handleKeydown);
 
 onBeforeUnmount(() => {
+  if (clockTimer !== null) {
+    window.clearInterval(clockTimer);
+  }
+  removeOnlineListener?.();
+  removeOfflineListener?.();
+  removeOfflineStateListener?.();
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('mouseup', stopDrag);
   window.removeEventListener('mousemove', handleResizeMove);
   window.removeEventListener('mouseup', stopResize);
   window.removeEventListener('keydown', handleKeydown);
+});
+
+onMounted(() => {
+  syncLauncherClock();
+  refreshLocalWorkspace();
+  updateConnectionStatus();
+  void updateServiceWorkerStatus();
+  updateDisplayMode();
+  clockTimer = window.setInterval(syncLauncherClock, 30000);
+  const onlineHandler = () => {
+    updateConnectionStatus();
+    void updateServiceWorkerStatus();
+    refreshLocalWorkspace();
+  };
+  const offlineHandler = () => {
+    updateConnectionStatus();
+  };
+  window.addEventListener('online', onlineHandler);
+  window.addEventListener('offline', offlineHandler);
+  removeOnlineListener = () => window.removeEventListener('online', onlineHandler);
+  removeOfflineListener = () => window.removeEventListener('offline', offlineHandler);
+  removeOfflineStateListener = addOfflineStateListener(() => {
+    offlineStateTick.value += 1;
+    refreshLocalWorkspace();
+  });
 });
 </script>

@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { handleAppsRoute } from './routes/apps.js';
 import { handleLoginRoute, handleLogoutRoute, handleSessionRoute } from './routes/auth.js';
-import { handleDesktopRoute, handleFeedbackRoute } from './routes/os.js';
+import { handleDesktopRoute, handleFeedbackRoute, handleNotesSyncRoute, handleTerminalSyncRoute } from './routes/os.js';
 import { sendJson } from './shared/http.js';
 
 const PORT = Number(process.env.PORT || 3010);
@@ -49,6 +49,16 @@ const server = createServer((request, response) => {
 
   if (request.method === 'POST' && requestUrl === '/api/os/feedback') {
     void handleFeedbackRoute(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && requestUrl === '/api/os/notes/sync') {
+    void handleNotesSyncRoute(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && requestUrl === '/api/os/terminal/sync') {
+    void handleTerminalSyncRoute(request, response);
     return;
   }
 

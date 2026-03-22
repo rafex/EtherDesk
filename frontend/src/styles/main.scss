@@ -45,6 +45,128 @@ button {
   padding: 24px;
 }
 
+.login-screen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.login-screen__backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(138, 182, 255, 0.3), transparent 18%),
+    radial-gradient(circle at 80% 18%, rgba(106, 235, 255, 0.18), transparent 20%),
+    linear-gradient(155deg, rgba(8, 17, 31, 0.38), rgba(8, 17, 31, 0.72)),
+    linear-gradient(145deg, #08111f 0%, #10243b 52%, #16314d 100%);
+  transform: scale(1.02);
+}
+
+.login-screen__lock,
+.login-screen__auth {
+  position: relative;
+  z-index: 1;
+}
+
+.login-screen__lock {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.login-screen__lock--hidden {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.98);
+  pointer-events: none;
+}
+
+.login-screen__time,
+.login-screen__date {
+  margin: 0;
+}
+
+.login-screen__time {
+  font-size: clamp(3.8rem, 9vw, 6.2rem);
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  text-shadow: 0 18px 32px rgba(0, 0, 0, 0.28);
+}
+
+.login-screen__date {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  color: rgba(233, 239, 255, 0.82);
+  text-transform: capitalize;
+}
+
+.login-screen__enter,
+.login-screen__back {
+  border: 0;
+  color: #f5f7fb;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.login-screen__enter {
+  min-height: 42px;
+  margin-top: 18px;
+  padding: 0 22px;
+  border-radius: 999px;
+}
+
+.login-screen__enter:hover,
+.login-screen__back:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.login-screen__auth {
+  width: min(420px, calc(100vw - 32px));
+  opacity: 0;
+  transform: translateY(22px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 280ms ease, transform 280ms ease;
+}
+
+.login-screen__auth--visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.login-screen__back {
+  min-height: 38px;
+  margin-bottom: 16px;
+  padding: 0 14px;
+  border-radius: 999px;
+}
+
+.login-screen__identity {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  text-align: center;
+}
+
+.login-screen__identity strong {
+  font-size: 1rem;
+}
+
+.login-screen__identity span {
+  color: rgba(233, 239, 255, 0.74);
+  font-size: 0.86rem;
+}
+
+.login-screen__avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 24px;
+  object-fit: cover;
+  box-shadow: 0 18px 42px rgba(8, 17, 31, 0.32);
+}
+
 .system-boot__panel {
   width: min(100%, 420px);
   padding: 32px;
@@ -66,6 +188,15 @@ button {
   box-shadow: rgba(133, 189, 215, 0.88) 0 30px 30px -20px;
 }
 
+.login-screen__auth .login-card {
+  max-width: 100%;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(8, 16, 29, 0.72);
+  box-shadow: 0 30px 50px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(24px);
+}
+
 .login-card__heading,
 .system-boot__eyebrow,
 .desktop-shell__eyebrow,
@@ -79,6 +210,10 @@ button {
   font-size: 30px;
   font-weight: 900;
   color: rgb(16, 137, 211);
+}
+
+.login-screen__auth .login-card__heading {
+  color: #eaf2ff;
 }
 
 .system-boot__eyebrow,
@@ -122,8 +257,18 @@ button {
   border-inline: 2px solid transparent;
 }
 
+.login-screen__auth .login-card__input {
+  color: #f5f7fb;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
 .login-card__input::placeholder {
   color: rgb(170, 170, 170);
+}
+
+.login-screen__auth .login-card__input::placeholder {
+  color: rgba(233, 239, 255, 0.48);
 }
 
 .login-card__input:focus {
@@ -147,6 +292,11 @@ button {
 .login-card__agreement a {
   color: #0099ff;
   text-decoration: none;
+}
+
+.login-screen__auth .login-card__forgot a,
+.login-screen__auth .login-card__agreement a {
+  color: #8fb8ff;
 }
 
 .login-card__forgot a {
@@ -426,6 +576,7 @@ button {
   border: 1px solid rgba(251, 191, 36, 0.16);
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(12px);
+  animation: desktop-toolbar-enter 220ms ease-out;
 }
 
 .desktop-topbar__item {
@@ -555,6 +706,9 @@ button {
   display: grid;
   place-items: center;
   z-index: 95;
+  background: radial-gradient(circle at center, rgba(10, 18, 31, 0.24), rgba(5, 12, 21, 0.58));
+  backdrop-filter: blur(12px);
+  animation: desktop-overlay-fade 180ms ease-out;
 }
 
 .desktop-launcher__grid {
@@ -576,6 +730,7 @@ button {
   justify-content: center;
   width: 314px;
   height: 70px;
+  animation: desktop-launcher-pop 220ms ease-out;
 }
 
 .desktop-launcher__white,
@@ -835,6 +990,80 @@ button {
   margin-top: 18px;
   display: grid;
   gap: 10px;
+  animation: desktop-launcher-rise 240ms ease-out;
+}
+
+.desktop-launcher__summary,
+.desktop-launcher__profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(10, 15, 24, 0.8);
+  backdrop-filter: blur(18px);
+}
+
+.desktop-launcher__summary strong,
+.desktop-launcher__profile-copy strong {
+  display: block;
+  color: #f8fbff;
+}
+
+.desktop-launcher__summary strong {
+  font-size: 1.5rem;
+  letter-spacing: -0.04em;
+}
+
+.desktop-launcher__summary span,
+.desktop-launcher__profile-copy span {
+  display: block;
+  color: #aeb9cb;
+  font-size: 0.78rem;
+}
+
+.desktop-launcher__summary span {
+  text-transform: capitalize;
+}
+
+.desktop-launcher__logout {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  color: #eaf2ff;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 180ms ease, transform 180ms ease;
+}
+
+.desktop-launcher__logout:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.desktop-launcher__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  object-fit: cover;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.24);
+}
+
+.desktop-launcher__profile {
+  justify-content: flex-start;
+}
+
+.desktop-launcher__profile-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.desktop-launcher__apps {
+  display: grid;
+  gap: 10px;
 }
 
 .desktop-launcher__result {
@@ -860,9 +1089,14 @@ button {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  color: #09111f;
-  font-weight: 700;
-  background: linear-gradient(135deg, #efe5ff 0%, #d79dff 100%);
+  color: #eff6ff;
+  background: linear-gradient(135deg, rgba(143, 184, 255, 0.24) 0%, rgba(121, 91, 255, 0.24) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.desktop-launcher__result-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .desktop-launcher__result-copy {
@@ -910,6 +1144,7 @@ button {
   border: 1px solid #212121;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
   transition: border-color 160ms ease, box-shadow 160ms ease;
+  animation: desktop-window-enter 220ms ease-out;
 }
 
 .desktop-window--focused {
@@ -1122,7 +1357,9 @@ button {
 
 .desktop-settings__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-start;
+  gap: 10px;
 }
 
 .desktop-settings__save {
@@ -1133,6 +1370,21 @@ button {
   color: #09111f;
   font-weight: 700;
   background: linear-gradient(135deg, #d6e8ff 0%, #8fb8ff 100%);
+}
+
+.desktop-settings__reset {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(248, 113, 113, 0.26);
+  border-radius: 10px;
+  color: #ffd7d7;
+  font-weight: 600;
+  background: rgba(127, 29, 29, 0.24);
+}
+
+.desktop-settings__reset:disabled {
+  opacity: 0.72;
+  cursor: wait;
 }
 
 .desktop-notification-center,
@@ -1220,6 +1472,134 @@ button {
   border-radius: 10px;
   color: #fff5f5;
   background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+}
+
+.desktop-files,
+.desktop-monitor,
+.desktop-account,
+.desktop-tasks,
+.desktop-help {
+  display: grid;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+}
+
+.desktop-files__header h2,
+.desktop-tasks h2,
+.desktop-help h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #f2f4f8;
+}
+
+.desktop-files__list,
+.desktop-tasks__list {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.desktop-files__item,
+.desktop-tasks__item,
+.desktop-monitor__card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.desktop-files__item--muted {
+  opacity: 0.68;
+}
+
+.desktop-files__item-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.desktop-files__item-main svg {
+  width: 20px;
+  height: 20px;
+}
+
+.desktop-files__item-main strong,
+.desktop-tasks__item strong,
+.desktop-monitor__card strong {
+  color: #f8fbff;
+}
+
+.desktop-files__item-main span,
+.desktop-tasks__item span,
+.desktop-monitor__card span,
+.desktop-account p {
+  color: rgba(233, 239, 255, 0.72);
+  font-size: 0.82rem;
+}
+
+.desktop-files__actions,
+.desktop-account__actions,
+.desktop-feedback__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.desktop-files__actions button,
+.desktop-account__actions button,
+.desktop-feedback__actions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: rgba(233, 239, 255, 0.9);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.desktop-files__actions button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.desktop-monitor__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.desktop-account__hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.desktop-account__hero h2 {
+  margin: 0 0 6px;
+  color: #f2f4f8;
+}
+
+.desktop-account__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+}
+
+.desktop-help__list {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(233, 239, 255, 0.82);
+}
+
+.desktop-help__list li + li {
+  margin-top: 8px;
 }
 
 .desktop-chat {
@@ -1702,8 +2082,17 @@ button {
 .desktop-minimized-dock__icon {
   position: relative;
   z-index: 1;
-  font-size: 1rem;
-  font-weight: 700;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+}
+
+.desktop-minimized-dock__icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  color: currentColor;
 }
 
 .desktop-minimized-dock__filled {
@@ -1743,6 +2132,7 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 14px 24px rgba(0, 0, 0, 0.28);
   pointer-events: auto;
+  animation: desktop-toast-enter 180ms ease-out;
 }
 
 .desktop-notification--error {
@@ -1766,6 +2156,27 @@ button {
   z-index: 70;
 }
 
+.desktop-version {
+  position: fixed;
+  right: 18px;
+  bottom: 58px;
+  display: grid;
+  justify-items: end;
+  z-index: 70;
+}
+
+.desktop-version span {
+  color: rgba(233, 239, 255, 0.56);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.desktop-version strong {
+  color: rgba(233, 239, 255, 0.82);
+  font-size: 0.9rem;
+}
+
 .desktop-rating__button {
   padding: 0;
   border: 0;
@@ -1782,6 +2193,74 @@ button {
 
 .desktop-rating__button--active {
   color: #016bf5;
+}
+
+.desktop-feedback {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 12, 21, 0.44);
+  backdrop-filter: blur(12px);
+  z-index: 110;
+}
+
+.desktop-feedback__panel {
+  width: min(100%, 460px);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 15, 24, 0.9);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.34);
+}
+
+.desktop-feedback__panel h2,
+.desktop-feedback__panel p {
+  margin: 0;
+}
+
+.desktop-feedback__panel h2 {
+  color: #f8fbff;
+}
+
+.desktop-feedback__panel p {
+  color: rgba(233, 239, 255, 0.76);
+}
+
+.desktop-feedback__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.desktop-feedback__chip {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: rgba(233, 239, 255, 0.84);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.desktop-feedback__chip--active {
+  border-color: rgba(143, 184, 255, 0.38);
+  background: rgba(143, 184, 255, 0.16);
+  color: #ffffff;
+}
+
+.desktop-feedback__textarea {
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  outline: none;
+  color: #f5f7fb;
+  background: rgba(8, 13, 22, 0.42);
 }
 
 .desktop-notification__content {
@@ -1856,6 +2335,83 @@ button {
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(16px);
   z-index: 90;
+  transform-origin: top left;
+  animation: desktop-context-enter 160ms ease-out;
+}
+
+@keyframes desktop-overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes desktop-launcher-pop {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes desktop-launcher-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes desktop-window-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes desktop-context-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes desktop-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes desktop-toolbar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .desktop-context-menu button {
@@ -1920,5 +2476,13 @@ button {
 
   .desktop-launcher__results {
     width: calc(100vw - 24px);
+  }
+
+  .login-screen__auth {
+    width: calc(100vw - 24px);
+  }
+
+  .login-screen__time {
+    font-size: 3.4rem;
   }
 }

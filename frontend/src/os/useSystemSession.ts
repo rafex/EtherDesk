@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import type { AppShortcut, DesktopKernelState, SessionUser } from '@/shared/types';
+import type { AppShortcut, DesktopKernelState, FeedbackSubmission, SessionUser } from '@/shared/types';
 import { createEtherDeskKernel } from '@/os/kernel';
 
 const SESSION_TOKEN_KEY = 'etherdesk.session.token';
@@ -74,8 +74,16 @@ export function useSystemSession() {
     return data;
   }
 
-  async function submitSatisfaction(rating: number) {
-    await kernel.submitSatisfaction(rating);
+  async function submitSatisfaction(feedback: FeedbackSubmission) {
+    await kernel.submitSatisfaction(feedback);
+  }
+
+  async function syncNotes(content: { content: string; updatedAt: string; syncedAt?: string | null }) {
+    await kernel.syncNotes(content);
+  }
+
+  async function syncTerminal(snapshot: { history: string[]; log: string[]; updatedAt: string; syncedAt?: string | null }) {
+    await kernel.syncTerminal(snapshot);
   }
 
   async function logout() {
@@ -98,6 +106,8 @@ export function useSystemSession() {
     restoreSession,
     loadDesktop,
     submitSatisfaction,
+    syncNotes,
+    syncTerminal,
     logout,
   };
 }

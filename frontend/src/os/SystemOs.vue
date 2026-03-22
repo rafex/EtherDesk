@@ -12,6 +12,7 @@
     :user-name="user?.name ?? 'ether'"
     :user-email="user?.email ?? 'demo@rafex.dev'"
     :initial-rating="desktopRating"
+    :os-version="osVersion"
     :service-alerts="serviceAlerts"
     @logout="handleLogout"
     @rate="handleRate"
@@ -24,21 +25,50 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import SystemBoot from '@/os/SystemBoot.vue';
 import LoginScreen from '@/os/LoginScreen.vue';
 import { useSystemSession } from '@/os/useSystemSession';
+import { addOfflineSyncListener, announceOfflineSyncComplete, flushOfflineQueue, queueOfflineAction } from '@/os/offline';
 import DesktopShell from '@/shell/DesktopShell.vue';
-import type { ServiceAlert } from '@/shared/types';
+import type { FeedbackSubmission, ServiceAlert } from '@/shared/types';
 
 const BOOT_DELAY_MS = 1800;
 
-const { user, apps, isAuthenticated, login, logout, restoreSession, loadDesktop, submitSatisfaction } = useSystemSession();
+const { user, apps, isAuthenticated, login, logout, restoreSession, loadDesktop, submitSatisfaction, syncNotes, syncTerminal } = useSystemSession();
 const isBooting = ref(false);
 const isSubmittingLogin = ref(false);
 const isRestoringSession = ref(true);
 const loginError = ref('');
 const desktopRating = ref(0);
+const osVersion = ref('0.1.0');
 const serviceAlerts = ref<ServiceAlert[]>([]);
 const nextServiceAlertId = ref(1);
 
 let bootTimer: number | null = null;
+let removeSyncListener: (() => void) | null = null;
+
+async function syncPendingOfflineActions() {
+  if (!isAuthenticated.value || !navigator.onLine) {
+    return;
+  }
+
+  try {
+    const result = await flushOfflineQueue({
+      syncNotes,
+      syncTerminal,
+      syncFeedback: submitSatisfaction,
+    });
+
+    if (result.processed > 0) {
+      announceOfflineSyncComplete();
+    }
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.offline-sync',
+      title: 'Fallo al sincronizar trabajo offline',
+      message: error instanceof Error ? error.message : 'No fue posible enviar los cambios locales al backend.',
+      createdAt: new Date().toISOString(),
+    });
+  }
+}
 
 function clearBootTimer() {
   if (bootTimer !== null) {
@@ -53,6 +83,8 @@ async function bootDesktop() {
 
   const desktopState = await loadDesktop();
   desktopRating.value = desktopState.preferences.satisfaction;
+  osVersion.value = desktopState.kernel.version;
+  await syncPendingOfflineActions();
 
   bootTimer = window.setTimeout(() => {
     isBooting.value = false;
@@ -82,19 +114,34 @@ async function handleLogout() {
   await logout();
 }
 
-async function handleRate(value: number) {
-  desktopRating.value = value;
+async function handleRate(feedback: FeedbackSubmission) {
+  desktopRating.value = feedback.rating;
 
   try {
-    await submitSatisfaction(value);
+    if (!navigator.onLine) {
+      queueOfflineAction({
+        type: 'feedback.sync',
+        payload: feedback,
+      });
+      return;
+    }
+
+    await submitSatisfaction(feedback);
   } catch (error) {
-    serviceAlerts.value.push({
-      id: nextServiceAlertId.value++,
-      service: 'os.feedback',
-      title: 'Fallo al registrar satisfaccion',
-      message: error instanceof Error ? error.message : 'El servicio devolvio un error inesperado.',
-      createdAt: new Date().toISOString(),
+    queueOfflineAction({
+      type: 'feedback.sync',
+      payload: feedback,
     });
+
+    if (navigator.onLine) {
+      serviceAlerts.value.push({
+        id: nextServiceAlertId.value++,
+        service: 'os.feedback',
+        title: 'Fallo al registrar satisfaccion',
+        message: error instanceof Error ? error.message : 'El servicio devolvio un error inesperado.',
+        createdAt: new Date().toISOString(),
+      });
+    }
   }
 }
 
@@ -104,9 +151,16 @@ function handleConsumeServiceAlert(alertId: number) {
 
 onBeforeUnmount(() => {
   clearBootTimer();
+  removeSyncListener?.();
+  window.removeEventListener('online', syncPendingOfflineActions);
 });
 
 onMounted(async () => {
+  removeSyncListener = addOfflineSyncListener(() => {
+    void syncPendingOfflineActions();
+  });
+  window.addEventListener('online', syncPendingOfflineActions);
+
   try {
     const restored = await restoreSession();
     if (restored) {

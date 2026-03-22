@@ -1,17 +1,23 @@
 <template>
-  <LoginScreen v-if="!isAuthenticated" @login="handleLogin" />
-  <SystemBoot v-else-if="isBooting" />
+  <LoginScreen
+    v-if="!isAuthenticated && !isRestoringSession"
+    :error-message="loginError"
+    :is-submitting="isSubmittingLogin"
+    @login="handleLogin"
+  />
+  <SystemBoot v-else-if="isBooting || isRestoringSession" />
   <DesktopShell
     v-else
-    :apps="desktopApps"
+    :apps="apps"
     :user-name="user?.name ?? 'ether'"
+    :initial-rating="desktopRating"
     @logout="handleLogout"
+    @rate="handleRate"
   />
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue';
-import { desktopApps } from '@/apps/apps';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import SystemBoot from '@/os/SystemBoot.vue';
 import LoginScreen from '@/os/LoginScreen.vue';
 import { useSystemSession } from '@/os/useSystemSession';
@@ -19,8 +25,12 @@ import DesktopShell from '@/shell/DesktopShell.vue';
 
 const BOOT_DELAY_MS = 1800;
 
-const { user, isAuthenticated, login, logout } = useSystemSession();
+const { user, apps, isAuthenticated, login, logout, restoreSession, loadDesktop, submitSatisfaction } = useSystemSession();
 const isBooting = ref(false);
+const isSubmittingLogin = ref(false);
+const isRestoringSession = ref(true);
+const loginError = ref('');
+const desktopRating = ref(0);
 
 let bootTimer: number | null = null;
 
@@ -31,10 +41,12 @@ function clearBootTimer() {
   }
 }
 
-function handleLogin(username: string) {
-  login(username);
+async function bootDesktop() {
   isBooting.value = true;
   clearBootTimer();
+
+  const desktopState = await loadDesktop();
+  desktopRating.value = desktopState.preferences.satisfaction;
 
   bootTimer = window.setTimeout(() => {
     isBooting.value = false;
@@ -42,13 +54,50 @@ function handleLogin(username: string) {
   }, BOOT_DELAY_MS);
 }
 
-function handleLogout() {
+async function handleLogin(credentials: { email: string; password: string }) {
+  isSubmittingLogin.value = true;
+  loginError.value = '';
+
+  try {
+    await login(credentials.email, credentials.password);
+    await bootDesktop();
+  } catch (error) {
+    loginError.value = error instanceof Error ? error.message : 'No fue posible iniciar sesion.';
+  } finally {
+    isSubmittingLogin.value = false;
+  }
+}
+
+async function handleLogout() {
   clearBootTimer();
   isBooting.value = false;
-  logout();
+  loginError.value = '';
+  desktopRating.value = 0;
+  await logout();
+}
+
+async function handleRate(value: number) {
+  desktopRating.value = value;
+
+  try {
+    await submitSatisfaction(value);
+  } catch {
+    // DesktopShell already provides local feedback; keep the UI responsive.
+  }
 }
 
 onBeforeUnmount(() => {
   clearBootTimer();
+});
+
+onMounted(async () => {
+  try {
+    const restored = await restoreSession();
+    if (restored) {
+      await bootDesktop();
+    }
+  } finally {
+    isRestoringSession.value = false;
+  }
 });
 </script>

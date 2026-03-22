@@ -1,4 +1,4 @@
-.PHONY: frontend-install frontend-dev frontend-start frontend-build frontend-preview backend-install backend-dev backend-start backend-build
+.PHONY: frontend-install frontend-dev frontend-start frontend-build frontend-preview backend-mock-install backend-mock-dev backend-mock-start backend-mock-build
 
 FRONTEND_DIR := frontend
 BACKEND_JS_DIR := backend/javascript
@@ -17,14 +17,14 @@ frontend-build:
 frontend-preview:
 	$(MAKE) -C $(FRONTEND_DIR) preview
 
-backend-install:
+backend-mock-install:
 	$(MAKE) -C $(BACKEND_JS_DIR) install
 
-backend-dev:
+backend-mock-dev:
 	$(MAKE) -C $(BACKEND_JS_DIR) dev
 
-backend-start:
+backend-mock-start:
 	$(MAKE) -C $(BACKEND_JS_DIR) start
 
-backend-build:
+backend-mock-build:
 	$(MAKE) -C $(BACKEND_JS_DIR) build

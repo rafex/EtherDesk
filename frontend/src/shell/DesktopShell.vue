@@ -432,10 +432,17 @@
     </section>
 
     <div class="desktop-rating" aria-label="Calificacion del sistema">
-      <label v-for="value in ratingOptions" :key="value" class="desktop-rating__label">
-        <input v-model="desktopRating" type="radio" name="desktop-rating" :value="value" />
-        <span class="desktop-rating__star"></span>
-      </label>
+      <button
+        v-for="value in ratingOptions"
+        :key="value"
+        class="desktop-rating__button"
+        :class="{ 'desktop-rating__button--active': value <= desktopRating }"
+        type="button"
+        :aria-label="`${value} estrella${value === 1 ? '' : 's'}`"
+        @click="setDesktopRating(value)"
+      >
+        ★
+      </button>
     </div>
 
     <div
@@ -455,7 +462,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type { AppShortcut } from '@/shared/types';
 
 interface DesktopWindow {
@@ -511,10 +518,12 @@ const MIN_WINDOW_HEIGHT = 220;
 const props = defineProps<{
   apps: AppShortcut[];
   userName: string;
+  initialRating: number;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   logout: [];
+  rate: [value: number];
 }>();
 
 const desktopRef = ref<HTMLElement | null>(null);
@@ -532,8 +541,8 @@ const notifications = ref<DesktopNotification[]>([]);
 const isAltTheme = ref(false);
 const isLauncherOpen = ref(false);
 const launcherQuery = ref('');
-const desktopRating = ref('0');
-const ratingOptions = ['5', '4', '3', '2', '1'];
+const desktopRating = ref(props.initialRating);
+const ratingOptions = [1, 2, 3, 4, 5];
 const nextBrowserTabId = ref(3);
 const browserTabs = ref<BrowserTab[]>([
   { id: 1, title: 'Uiverse', url: 'uiverse.io' },
@@ -602,6 +611,13 @@ const filteredApps = computed(() => {
     return `${app.name} ${app.description}`.toLowerCase().includes(normalizedQuery);
   });
 });
+
+watch(
+  () => props.initialRating,
+  (value) => {
+    desktopRating.value = value;
+  },
+);
 
 let dragState:
   | {
@@ -954,6 +970,12 @@ function notify(title: string, description: string) {
 
 function dismissNotification(notificationId: number) {
   notifications.value = notifications.value.filter((item) => item.id !== notificationId);
+}
+
+function setDesktopRating(value: number) {
+  desktopRating.value = value;
+  emit('rate', value);
+  notify('Satisfaccion registrada', `Calificacion actual: ${value} de 5 estrellas.`);
 }
 
 function handleThemeToggle() {

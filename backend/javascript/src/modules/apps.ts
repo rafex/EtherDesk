@@ -4,9 +4,17 @@ export interface MockApp {
   description: string;
   icon: string;
   route: string;
+  url?: string;
 }
 
 export const mockApps: MockApp[] = [
+  {
+    id: 'browser',
+    name: 'Browser',
+    description: 'Navegador web conceptual dentro de EtherDesk.',
+    icon: 'B',
+    route: '/apps/browser',
+  },
   {
     id: 'notes',
     name: 'Notes',
@@ -22,10 +30,17 @@ export const mockApps: MockApp[] = [
     route: '/apps/terminal',
   },
   {
-    id: 'launcher',
-    name: 'Launcher',
-    description: 'Acceso a herramientas del sistema.',
-    icon: 'L',
-    route: '/apps/launcher',
+    id: 'settings',
+    name: 'Settings',
+    description: 'Configuracion visual del sistema.',
+    icon: 'S',
+    route: '/apps/settings',
+  },
+  {
+    id: 'tars-chat',
+    name: 'TARS Chat',
+    description: 'Asistente local del sistema para ayuda rapida.',
+    icon: 'C',
+    route: '/apps/tars-chat',
   },
 ];

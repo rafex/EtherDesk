@@ -170,6 +170,11 @@ button {
   width: 100%;
 }
 
+.login-card__submit:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
 .login-card__submit:hover {
   transform: scale(1.03);
   box-shadow: rgba(133, 189, 215, 0.88) 0 23px 10px -20px;
@@ -1491,13 +1496,14 @@ button {
 }
 
 .desktop-notifications {
-  position: absolute;
+  position: fixed;
   top: 76px;
   right: 22px;
   display: grid;
   gap: 10px;
   width: min(288px, calc(100vw - 44px));
   z-index: 80;
+  pointer-events: none;
 }
 
 .desktop-notification {
@@ -1511,38 +1517,33 @@ button {
   background: var(--desktop-notification-bg);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 14px 24px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
 }
 
 .desktop-rating {
-  position: absolute;
+  position: fixed;
   right: 18px;
   bottom: 18px;
   display: flex;
-  flex-direction: row-reverse;
+  gap: 4px;
   z-index: 70;
 }
 
-.desktop-rating input[type="radio"] {
-  display: none;
-}
-
-.desktop-rating__label {
-  margin: 0 2px;
-  cursor: pointer;
-}
-
-.desktop-rating__star {
-  display: inline-block;
+.desktop-rating__button {
+  padding: 0;
+  border: 0;
+  background: transparent;
   font-size: 30px;
   color: rgba(187, 183, 183, 0.726);
+  line-height: 1;
+  transition: color 160ms ease, transform 160ms ease;
 }
 
-.desktop-rating__star::before {
-  content: "\2605";
+.desktop-rating__button:hover {
+  transform: translateY(-1px);
 }
 
-.desktop-rating input[type="radio"]:checked ~ .desktop-rating__star::before {
-  content: "\2606";
+.desktop-rating__button--active {
   color: #016bf5;
 }
 

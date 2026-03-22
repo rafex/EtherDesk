@@ -1,5 +1,7 @@
 import { createServer } from 'node:http';
 import { handleAppsRoute } from './routes/apps.js';
+import { handleLoginRoute, handleLogoutRoute, handleSessionRoute } from './routes/auth.js';
+import { handleDesktopRoute, handleFeedbackRoute } from './routes/os.js';
 import { sendJson } from './shared/http.js';
 
 const PORT = Number(process.env.PORT || 3010);
@@ -25,6 +27,31 @@ const server = createServer((request, response) => {
     return;
   }
 
+  if (request.method === 'POST' && requestUrl === '/api/auth/login') {
+    void handleLoginRoute(request, response);
+    return;
+  }
+
+  if (request.method === 'GET' && requestUrl === '/api/auth/session') {
+    handleSessionRoute(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && requestUrl === '/api/auth/logout') {
+    handleLogoutRoute(request, response);
+    return;
+  }
+
+  if (request.method === 'GET' && requestUrl === '/api/os/desktop') {
+    handleDesktopRoute(request, response);
+    return;
+  }
+
+  if (request.method === 'POST' && requestUrl === '/api/os/feedback') {
+    void handleFeedbackRoute(request, response);
+    return;
+  }
+
   sendJson(response, 404, {
     error: 'not_found',
   });
@@ -32,4 +59,8 @@ const server = createServer((request, response) => {
 
 server.listen(PORT, () => {
   console.log(`EtherDesk mock backend listening on http://localhost:${PORT}`);
+
+  if (!process.env.ETHERDESK_AUTH_EMAIL || !process.env.ETHERDESK_AUTH_PASSWORD) {
+    console.warn('EtherDesk auth is not configured. Set ETHERDESK_AUTH_EMAIL and ETHERDESK_AUTH_PASSWORD.');
+  }
 });

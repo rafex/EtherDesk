@@ -27,10 +27,12 @@
         <p v-if="errorMessage" class="login-card__error">{{ errorMessage }}</p>
 
         <span class="login-card__forgot">
-          <a href="#" @click.prevent>Credenciales demo: demo@rafex.dev / demo</a>
+          <a href="#" @click.prevent>Autenticacion delegada al kernel del backend</a>
         </span>
 
-        <button class="login-card__submit" type="submit">Sign In</button>
+        <button class="login-card__submit" type="submit" :disabled="isSubmitting">
+          {{ isSubmitting ? 'Signing In...' : 'Sign In' }}
+        </button>
       </form>
 
       <div class="login-card__social">
@@ -67,24 +69,21 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-const DEMO_EMAIL = 'demo@rafex.dev';
-const DEMO_PASSWORD = 'demo';
-
+defineProps<{
+  errorMessage?: string;
+  isSubmitting?: boolean;
+}>();
 const emit = defineEmits<{
-  login: [username: string];
+  login: [credentials: { email: string; password: string }];
 }>();
 
-const username = ref(DEMO_EMAIL);
-const password = ref(DEMO_PASSWORD);
-const errorMessage = ref('');
+const username = ref('demo@rafex.dev');
+const password = ref('demo');
 
 function submitLogin() {
-  if (username.value.trim().toLowerCase() !== DEMO_EMAIL || password.value !== DEMO_PASSWORD) {
-    errorMessage.value = 'Usuario o contrasena incorrectos. Usa demo@rafex.dev / demo.';
-    return;
-  }
-
-  errorMessage.value = '';
-  emit('login', username.value);
+  emit('login', {
+    email: username.value.trim(),
+    password: password.value,
+  });
 }
 </script>

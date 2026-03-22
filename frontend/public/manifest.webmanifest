@@ -1,0 +1,23 @@
+{
+  "name": "EtherDesk",
+  "short_name": "EtherDesk",
+  "description": "Portal web con apariencia de sistema operativo para acceso unificado a herramientas del escritorio.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1d31",
+  "theme_color": "#0f1d31",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

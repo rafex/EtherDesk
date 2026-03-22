@@ -1,34 +1,103 @@
 import { computed, ref } from 'vue';
-import type { SessionUser } from '@/shared/types';
+import type { AppShortcut, DesktopKernelState, SessionUser } from '@/shared/types';
+import { createEtherDeskKernel } from '@/os/kernel';
 
-const DEFAULT_USER = 'ether';
+const SESSION_TOKEN_KEY = 'etherdesk.session.token';
 
 const activeUser = ref<SessionUser | null>(null);
+const desktopApps = ref<AppShortcut[]>([]);
+const sessionToken = ref<string | null>(readStoredToken());
+const kernel = createEtherDeskKernel(() => sessionToken.value);
 
-function createSessionUser(name: string): SessionUser {
-  return {
-    id: 'local-user',
-    name,
-    role: 'owner',
-  };
+function readStoredToken() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.localStorage.getItem(SESSION_TOKEN_KEY);
+}
+
+function storeToken(token: string | null) {
+  sessionToken.value = token;
+
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (token) {
+    window.localStorage.setItem(SESSION_TOKEN_KEY, token);
+  } else {
+    window.localStorage.removeItem(SESSION_TOKEN_KEY);
+  }
+}
+
+function applyDesktopState(state: DesktopKernelState) {
+  activeUser.value = state.user;
+  desktopApps.value = state.apps;
 }
 
 export function useSystemSession() {
-  const isAuthenticated = computed(() => activeUser.value !== null);
+  const isAuthenticated = computed(() => activeUser.value !== null && Boolean(sessionToken.value));
 
-  function login(name: string) {
-    const normalizedName = name.trim() || DEFAULT_USER;
-    activeUser.value = createSessionUser(normalizedName);
+  async function login(email: string, password: string) {
+    const data = await kernel.login(email, password);
+
+    storeToken(data.token);
+    activeUser.value = data.user;
+
+    return data.user;
   }
 
-  function logout() {
-    activeUser.value = null;
+  async function restoreSession() {
+    if (!sessionToken.value) {
+      return false;
+    }
+
+    try {
+      const data = await kernel.restoreSession();
+
+      storeToken(data.token);
+      activeUser.value = data.user;
+      return true;
+    } catch {
+      storeToken(null);
+      activeUser.value = null;
+      desktopApps.value = [];
+      return false;
+    }
+  }
+
+  async function loadDesktop() {
+    const data = await kernel.loadDesktop();
+
+    applyDesktopState(data);
+    return data;
+  }
+
+  async function submitSatisfaction(rating: number) {
+    await kernel.submitSatisfaction(rating);
+  }
+
+  async function logout() {
+    try {
+      if (sessionToken.value) {
+        await kernel.logout();
+      }
+    } finally {
+      storeToken(null);
+      activeUser.value = null;
+      desktopApps.value = [];
+    }
   }
 
   return {
     user: activeUser,
+    apps: desktopApps,
     isAuthenticated,
     login,
+    restoreSession,
+    loadDesktop,
+    submitSatisfaction,
     logout,
   };
 }

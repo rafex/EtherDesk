@@ -10,9 +10,12 @@
     v-else
     :apps="apps"
     :user-name="user?.name ?? 'ether'"
+    :user-email="user?.email ?? 'demo@rafex.dev'"
     :initial-rating="desktopRating"
+    :service-alerts="serviceAlerts"
     @logout="handleLogout"
     @rate="handleRate"
+    @consume-service-alert="handleConsumeServiceAlert"
   />
 </template>
 
@@ -22,6 +25,7 @@ import SystemBoot from '@/os/SystemBoot.vue';
 import LoginScreen from '@/os/LoginScreen.vue';
 import { useSystemSession } from '@/os/useSystemSession';
 import DesktopShell from '@/shell/DesktopShell.vue';
+import type { ServiceAlert } from '@/shared/types';
 
 const BOOT_DELAY_MS = 1800;
 
@@ -31,6 +35,8 @@ const isSubmittingLogin = ref(false);
 const isRestoringSession = ref(true);
 const loginError = ref('');
 const desktopRating = ref(0);
+const serviceAlerts = ref<ServiceAlert[]>([]);
+const nextServiceAlertId = ref(1);
 
 let bootTimer: number | null = null;
 
@@ -81,9 +87,19 @@ async function handleRate(value: number) {
 
   try {
     await submitSatisfaction(value);
-  } catch {
-    // DesktopShell already provides local feedback; keep the UI responsive.
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.feedback',
+      title: 'Fallo al registrar satisfaccion',
+      message: error instanceof Error ? error.message : 'El servicio devolvio un error inesperado.',
+      createdAt: new Date().toISOString(),
+    });
   }
+}
+
+function handleConsumeServiceAlert(alertId: number) {
+  serviceAlerts.value = serviceAlerts.value.filter((alert) => alert.id !== alertId);
 }
 
 onBeforeUnmount(() => {

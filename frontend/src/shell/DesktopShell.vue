@@ -2,7 +2,10 @@
   <main
     ref="desktopRef"
     class="desktop-shell"
-    :class="{ 'desktop-shell--alt': isAltTheme }"
+    :class="[
+      { 'desktop-shell--alt': isAltTheme },
+      `desktop-shell--wallpaper-${wallpaperVariant}`,
+    ]"
     @click="closeContextMenu"
     @contextmenu.prevent="openContextMenu"
   >
@@ -18,15 +21,7 @@
           <span class="desktop-topbar__tooltip">Home</span>
         </button>
 
-        <button class="desktop-topbar__item" type="button" @click.stop="restoreAllWindows">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M21 21H4.6c-1.1 0-2-.9-2-2V3"></path>
-            <path d="m19 8-7 6-4-4-4 4"></path>
-          </svg>
-          <span class="desktop-topbar__tooltip">Analytics</span>
-        </button>
-
-        <button class="desktop-topbar__item" type="button" @click.stop="notifyNotificationCenter">
+        <button class="desktop-topbar__item" type="button" @click.stop="openNotificationCenter">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -43,14 +38,14 @@
           <span class="desktop-topbar__tooltip">Messages</span>
         </button>
 
-        <button class="desktop-topbar__item" type="button" @click.stop="toggleTheme">
+        <button class="desktop-topbar__item" type="button" @click.stop="openAppWindow('settings')">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="3"></circle>
             <path
               d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
             ></path>
           </svg>
-          <span class="desktop-topbar__tooltip">Settings / Color</span>
+          <span class="desktop-topbar__tooltip">Settings</span>
         </button>
 
         <label class="desktop-topbar__theme-switch" @click.stop>
@@ -208,24 +203,20 @@
 
         <div class="desktop-window__body" :class="{ 'desktop-window__body--browser': windowItem.appId === 'browser' }">
           <div v-if="windowItem.appId === 'browser'" class="desktop-browser">
-            <div class="desktop-browser__tabs-head">
+            <div class="desktop-browser__tabs-head" @mousedown.stop="startDrag($event, windowItem.id)">
               <div class="desktop-browser__tabs-list">
                 <button
                   v-for="tab in browserTabs"
                   :key="tab.id"
                   class="desktop-browser__tab-open"
+                  :class="{ 'desktop-browser__tab-open--active': tab.id === activeBrowserTabId }"
                   type="button"
                   @click="selectBrowserTab(tab.id)"
                 >
-                  <div class="desktop-browser__rounded desktop-browser__rounded--left">
-                    <div class="desktop-browser__mask-round"></div>
-                  </div>
                   <span class="desktop-browser__tab-name">{{ tab.title }}</span>
                   <span class="desktop-browser__close-tab" @click.stop="closeBrowserTab(tab.id)">✕</span>
-                  <div class="desktop-browser__rounded desktop-browser__rounded--right">
-                    <div class="desktop-browser__mask-round"></div>
-                  </div>
                 </button>
+                <button class="desktop-browser__new-tab" type="button" @click.stop="addBrowserTab()">+</button>
               </div>
 
               <div class="desktop-browser__window-opt" @mousedown.stop>
@@ -339,6 +330,118 @@
             </form>
           </div>
 
+          <div v-else-if="windowItem.appId === 'settings'" class="desktop-settings">
+            <section class="desktop-settings__section">
+              <div class="desktop-settings__section-head">
+                <p class="desktop-window__eyebrow">Appearance</p>
+                <h2>Configuracion del escritorio</h2>
+              </div>
+
+              <div class="desktop-settings__group">
+                <span class="desktop-settings__label">Tema</span>
+                <div class="desktop-settings__choices">
+                  <button
+                    class="desktop-settings__choice"
+                    :class="{ 'desktop-settings__choice--active': !isAltTheme }"
+                    type="button"
+                    @click="setThemeMode(false)"
+                  >
+                    Oceano
+                  </button>
+                  <button
+                    class="desktop-settings__choice"
+                    :class="{ 'desktop-settings__choice--active': isAltTheme }"
+                    type="button"
+                    @click="setThemeMode(true)"
+                  >
+                    Arena
+                  </button>
+                </div>
+              </div>
+
+              <div class="desktop-settings__group">
+                <span class="desktop-settings__label">Fondo de pantalla</span>
+                <div class="desktop-settings__choices">
+                  <button
+                    v-for="option in wallpaperOptions"
+                    :key="option.id"
+                    class="desktop-settings__choice desktop-settings__choice--wallpaper"
+                    :class="{ 'desktop-settings__choice--active': wallpaperVariant === option.id }"
+                    type="button"
+                    @click="setWallpaper(option.id)"
+                  >
+                    <span class="desktop-settings__swatch" :class="`desktop-settings__swatch--${option.id}`"></span>
+                    {{ option.label }}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="desktop-settings__section">
+              <div class="desktop-settings__section-head">
+                <p class="desktop-window__eyebrow">Profile</p>
+                <h2>Datos del usuario</h2>
+              </div>
+
+              <label class="desktop-settings__field">
+                <span>Nombre</span>
+                <input v-model="profileDraft.name" type="text" />
+              </label>
+
+              <label class="desktop-settings__field">
+                <span>Correo</span>
+                <input v-model="profileDraft.email" type="email" />
+              </label>
+
+              <div class="desktop-settings__actions">
+                <button class="desktop-settings__save" type="button" @click="saveProfileSettings">
+                  Guardar cambios
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <div v-else-if="windowItem.appId === 'notification-center'" class="desktop-notification-center">
+            <div class="desktop-notification-center__header">
+              <p class="desktop-window__eyebrow">Inbox</p>
+              <h2>Ultimas notificaciones</h2>
+            </div>
+
+            <div class="desktop-notification-center__list">
+              <article
+                v-for="group in groupedRecentNotifications"
+                :key="group.id"
+                class="desktop-notification-center__item"
+                :class="`desktop-notification-center__item--${group.kind}`"
+              >
+                <div class="desktop-notification-center__item-head">
+                  <strong>{{ group.title }}</strong>
+                  <span>{{ formatNotificationTime(group.createdAt) }}</span>
+                </div>
+                <p>{{ group.description }}</p>
+                <div class="desktop-notification-center__meta">
+                  <span>{{ group.sourceLabel }}</span>
+                  <span v-if="group.count > 1">{{ group.count }} eventos</span>
+                </div>
+              </article>
+
+              <p v-if="groupedRecentNotifications.length === 0" class="desktop-notification-center__empty">
+                No hay notificaciones recientes.
+              </p>
+            </div>
+          </div>
+
+          <div v-else-if="windowItem.appId === 'service-alert'" class="desktop-service-alert">
+            <p class="desktop-window__eyebrow">Service Alert</p>
+            <h2>{{ windowItem.title }}</h2>
+            <p>{{ windowItem.description }}</p>
+            <div class="desktop-service-alert__actions">
+              <button class="desktop-service-alert__button" type="button" @click="closeWindow(windowItem.id)">
+                Entendido
+              </button>
+            </div>
+          </div>
+
           <div v-else class="desktop-window__editor-card">
             <div class="desktop-window__editor-meta">
               <p class="desktop-window__eyebrow">{{ windowItem.appName }}</p>
@@ -387,9 +490,10 @@
 
     <section class="desktop-notifications" aria-label="Notificaciones del sistema">
       <article
-        v-for="notification in notifications"
+        v-for="notification in toastNotifications"
         :key="notification.id"
         class="desktop-notification"
+        :class="`desktop-notification--${notification.kind}`"
       >
         <div class="desktop-notification__content">
           <div class="desktop-notification__icon">
@@ -463,7 +567,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import type { AppShortcut } from '@/shared/types';
+import type { AppShortcut, ServiceAlert } from '@/shared/types';
 
 interface DesktopWindow {
   id: string;
@@ -479,6 +583,9 @@ interface DesktopWindow {
   zIndex: number;
   isMinimized: boolean;
   isMaximized: boolean;
+  metadata?: {
+    alertId?: number;
+  };
 }
 
 interface ContextMenuState {
@@ -491,6 +598,11 @@ interface DesktopNotification {
   id: number;
   title: string;
   description: string;
+  kind: 'success' | 'info' | 'warning' | 'error';
+  sourceId: string;
+  sourceLabel: string;
+  createdAt: string;
+  isToastVisible: boolean;
 }
 
 interface ChatMessage {
@@ -508,22 +620,27 @@ interface BrowserTab {
   url: string;
 }
 
+type WallpaperVariant = 'ocean' | 'sunset' | 'graphite';
+
 const WINDOW_WIDTH = 440;
 const WINDOW_HEIGHT = 320;
 const MAXIMIZED_MARGIN = 18;
-const MAXIMIZED_TOP_OFFSET = 60;
+const MAXIMIZED_TOP_OFFSET = 43;
 const MIN_WINDOW_WIDTH = 320;
 const MIN_WINDOW_HEIGHT = 220;
 
 const props = defineProps<{
   apps: AppShortcut[];
   userName: string;
+  userEmail: string;
   initialRating: number;
+  serviceAlerts: ServiceAlert[];
 }>();
 
 const emit = defineEmits<{
   logout: [];
   rate: [value: number];
+  'consume-service-alert': [alertId: number];
 }>();
 
 const desktopRef = ref<HTMLElement | null>(null);
@@ -539,6 +656,7 @@ const highestZIndex = ref(3);
 const nextNotificationId = ref(1);
 const notifications = ref<DesktopNotification[]>([]);
 const isAltTheme = ref(false);
+const wallpaperVariant = ref<WallpaperVariant>('ocean');
 const isLauncherOpen = ref(false);
 const launcherQuery = ref('');
 const desktopRating = ref(props.initialRating);
@@ -549,6 +667,15 @@ const browserTabs = ref<BrowserTab[]>([
   { id: 2, title: 'Rafex', url: 'rafex.dev' },
 ]);
 const activeBrowserTabId = ref(1);
+const profileDraft = ref({
+  name: props.userName,
+  email: props.userEmail,
+});
+const wallpaperOptions: Array<{ id: WallpaperVariant; label: string }> = [
+  { id: 'ocean', label: 'Oceano' },
+  { id: 'sunset', label: 'Sunset' },
+  { id: 'graphite', label: 'Graphite' },
+];
 const nextChatMessageId = ref(5);
 const chatDraft = ref('');
 const chatMessages = ref<ChatMessage[]>([
@@ -597,8 +724,38 @@ const windows = ref<DesktopWindow[]>([
 
 const visibleWindows = computed(() => windows.value.filter((windowItem) => !windowItem.isMinimized));
 const minimizedWindows = computed(() => windows.value.filter((windowItem) => windowItem.isMinimized));
+const toastNotifications = computed(() => notifications.value.filter((item) => item.isToastVisible).slice(0, 3));
 const activeBrowserTab = computed(() => {
   return browserTabs.value.find((tab) => tab.id === activeBrowserTabId.value) ?? browserTabs.value[0] ?? null;
+});
+const groupedRecentNotifications = computed(() => {
+  const recent = notifications.value.slice(0, 7);
+  const grouped = new Map<string, { id: string; kind: DesktopNotification['kind']; sourceLabel: string; title: string; description: string; count: number; createdAt: string }>();
+
+  recent.forEach((notification) => {
+    const groupKey = `${notification.sourceId}:${notification.kind}`;
+    const existing = grouped.get(groupKey);
+
+    if (existing) {
+      existing.count += 1;
+      existing.title = notification.title;
+      existing.description = notification.description;
+      existing.createdAt = notification.createdAt;
+      return;
+    }
+
+    grouped.set(groupKey, {
+      id: groupKey,
+      kind: notification.kind,
+      sourceLabel: notification.sourceLabel,
+      title: notification.title,
+      description: notification.description,
+      count: 1,
+      createdAt: notification.createdAt,
+    });
+  });
+
+  return Array.from(grouped.values());
 });
 const filteredApps = computed(() => {
   const normalizedQuery = launcherQuery.value.trim().toLowerCase();
@@ -617,6 +774,53 @@ watch(
   (value) => {
     desktopRating.value = value;
   },
+);
+
+watch(
+  () => [props.userName, props.userEmail],
+  ([name, email]) => {
+    profileDraft.value = { name, email };
+  },
+);
+
+watch(
+  () => props.serviceAlerts,
+  (alerts) => {
+    alerts.forEach((alert) => {
+      const hasWindow = windows.value.some((windowItem) => windowItem.metadata?.alertId === alert.id);
+      if (hasWindow) {
+        return;
+      }
+
+      const windowId = `service-alert-${alert.id}`;
+      windows.value.push({
+        id: windowId,
+        appId: 'service-alert',
+        appName: 'Service Alert',
+        label: 'Alerta',
+        title: alert.title,
+        description: alert.message,
+        x: 110 + windows.value.length * 16,
+        y: 86 + windows.value.length * 16,
+        width: 420,
+        height: 240,
+        zIndex: nextZIndex(),
+        isMinimized: false,
+        isMaximized: false,
+        metadata: {
+          alertId: alert.id,
+        },
+      });
+
+      notify(alert.title, alert.message, {
+        kind: 'error',
+        sourceId: alert.service,
+        sourceLabel: alert.service,
+      });
+      emit('consume-service-alert', alert.id);
+    });
+  },
+  { deep: true },
 );
 
 let dragState:
@@ -672,6 +876,36 @@ function buildWindow(app: AppShortcut): DesktopWindow {
   };
 }
 
+function buildSpecialWindow(config: {
+  id: string;
+  appId: string;
+  appName: string;
+  title: string;
+  description: string;
+  width?: number;
+  height?: number;
+  metadata?: DesktopWindow['metadata'];
+}) {
+  const offset = windows.value.length * 18;
+
+  return {
+    id: config.id,
+    appId: config.appId,
+    appName: config.appName,
+    label: 'Sistema',
+    title: config.title,
+    description: config.description,
+    x: 92 + offset,
+    y: 84 + offset,
+    width: config.width ?? WINDOW_WIDTH,
+    height: config.height ?? WINDOW_HEIGHT,
+    zIndex: nextZIndex(),
+    isMinimized: false,
+    isMaximized: false,
+    metadata: config.metadata,
+  } satisfies DesktopWindow;
+}
+
 function openAppWindow(appId: string) {
   closeContextMenu();
   closeLauncher();
@@ -680,7 +914,11 @@ function openAppWindow(appId: string) {
   if (existingWindow) {
     existingWindow.isMinimized = false;
     focusWindow(existingWindow.id);
-    notify('App restaurada', `${existingWindow.appName} volvio al escritorio.`);
+    notify('App restaurada', `${existingWindow.appName} volvio al escritorio.`, {
+      kind: 'info',
+      sourceId: existingWindow.appId,
+      sourceLabel: existingWindow.appName,
+    });
     return;
   }
 
@@ -692,7 +930,36 @@ function openAppWindow(appId: string) {
   const windowItem = buildWindow(app);
   windows.value.push(windowItem);
   activeWindowId.value = windowItem.id;
-  notify('App abierta', `${app.name} se agrego al escritorio.`);
+  notify('App abierta', `${app.name} se agrego al escritorio.`, {
+    kind: 'success',
+    sourceId: app.id,
+    sourceLabel: app.name,
+  });
+}
+
+function openNotificationCenter() {
+  closeContextMenu();
+  closeLauncher();
+
+  const existingWindow = windows.value.find((windowItem) => windowItem.appId === 'notification-center');
+  if (existingWindow) {
+    existingWindow.isMinimized = false;
+    focusWindow(existingWindow.id);
+    return;
+  }
+
+  const windowItem = buildSpecialWindow({
+    id: 'notification-center',
+    appId: 'notification-center',
+    appName: 'Notifications',
+    title: 'Notifications',
+    description: 'Historial de notificaciones del sistema.',
+    width: 460,
+    height: 380,
+  });
+
+  windows.value.push(windowItem);
+  activeWindowId.value = windowItem.id;
 }
 
 function minimizeWindow(windowId: string) {
@@ -702,7 +969,11 @@ function minimizeWindow(windowId: string) {
   }
 
   windowItem.isMinimized = true;
-  notify('Ventana minimizada', `${windowItem.appName} se envio al area de minimizadas.`);
+  notify('Ventana minimizada', `${windowItem.appName} se envio al area de minimizadas.`, {
+    kind: 'info',
+    sourceId: windowItem.appId,
+    sourceLabel: windowItem.appName,
+  });
 
   const fallbackWindow = visibleWindows.value.find((item) => item.id !== windowId);
   activeWindowId.value = fallbackWindow?.id ?? '';
@@ -716,7 +987,11 @@ function restoreWindow(windowId: string) {
 
   windowItem.isMinimized = false;
   focusWindow(windowId);
-  notify('Ventana restaurada', `${windowItem.appName} volvio al escritorio.`);
+  notify('Ventana restaurada', `${windowItem.appName} volvio al escritorio.`, {
+    kind: 'info',
+    sourceId: windowItem.appId,
+    sourceLabel: windowItem.appName,
+  });
 }
 
 function closeWindow(windowId: string) {
@@ -729,7 +1004,11 @@ function closeWindow(windowId: string) {
 
   const fallbackWindow = windows.value.find((item) => !item.isMinimized);
   activeWindowId.value = fallbackWindow?.id ?? '';
-  notify('Ventana cerrada', `${windowItem.appName} se cerro.`);
+  notify('Ventana cerrada', `${windowItem.appName} se cerro.`, {
+    kind: 'info',
+    sourceId: windowItem.appId,
+    sourceLabel: windowItem.appName,
+  });
 }
 
 function toggleMaximize(windowId: string) {
@@ -743,6 +1022,11 @@ function toggleMaximize(windowId: string) {
   notify(
     windowItem.isMaximized ? 'Ventana maximizada' : 'Ventana restaurada',
     `${windowItem.appName} cambio su tamano de trabajo.`,
+    {
+      kind: 'info',
+      sourceId: windowItem.appId,
+      sourceLabel: windowItem.appName,
+    },
   );
 }
 
@@ -756,7 +1040,11 @@ function restoreAllWindows() {
   }
 
   closeContextMenu();
-  notify('Ventanas restauradas', 'Todas las ventanas visibles volvieron al escritorio.');
+  notify('Ventanas restauradas', 'Todas las ventanas visibles volvieron al escritorio.', {
+    kind: 'info',
+    sourceId: 'system',
+    sourceLabel: 'System',
+  });
 }
 
 function isAppOpen(appId: string) {
@@ -804,7 +1092,11 @@ function closeLauncher() {
 
 function launchFromLauncher(appId: string) {
   openAppWindow(appId);
-  notify('Launcher', 'Aplicacion abierta desde el launcher.');
+  notify('Launcher', 'Aplicacion abierta desde el launcher.', {
+    kind: 'success',
+    sourceId: 'launcher',
+    sourceLabel: 'Launcher',
+  });
 }
 
 function startDrag(event: MouseEvent, windowId: string) {
@@ -953,7 +1245,15 @@ function deriveBrowserTitle(url: string) {
   return hostname ? hostname.charAt(0).toUpperCase() + hostname.slice(1) : 'New Tab';
 }
 
-function notify(title: string, description: string) {
+function notify(
+  title: string,
+  description: string,
+  options: {
+    kind?: DesktopNotification['kind'];
+    sourceId?: string;
+    sourceLabel?: string;
+  } = {},
+) {
   const id = nextNotificationId.value;
   nextNotificationId.value += 1;
 
@@ -961,7 +1261,14 @@ function notify(title: string, description: string) {
     id,
     title,
     description,
+    kind: options.kind ?? 'info',
+    sourceId: options.sourceId ?? 'system',
+    sourceLabel: options.sourceLabel ?? 'System',
+    createdAt: new Date().toISOString(),
+    isToastVisible: true,
   });
+
+  notifications.value = notifications.value.slice(0, 30);
 
   window.setTimeout(() => {
     dismissNotification(id);
@@ -969,19 +1276,31 @@ function notify(title: string, description: string) {
 }
 
 function dismissNotification(notificationId: number) {
-  notifications.value = notifications.value.filter((item) => item.id !== notificationId);
+  const notification = notifications.value.find((item) => item.id === notificationId);
+  if (notification) {
+    notification.isToastVisible = false;
+  }
 }
 
 function setDesktopRating(value: number) {
   desktopRating.value = value;
   emit('rate', value);
-  notify('Satisfaccion registrada', `Calificacion actual: ${value} de 5 estrellas.`);
+  notify('Satisfaccion registrada', `Calificacion actual: ${value} de 5 estrellas.`, {
+    kind: 'success',
+    sourceId: 'os.feedback',
+    sourceLabel: 'Feedback',
+  });
 }
 
 function handleThemeToggle() {
   notify(
     'Tema actualizado',
     isAltTheme.value ? 'El sistema cambio a la paleta nocturna.' : 'El sistema volvio a la paleta oceano.',
+    {
+      kind: 'success',
+      sourceId: 'settings',
+      sourceLabel: 'Settings',
+    },
   );
 }
 
@@ -990,8 +1309,52 @@ function toggleTheme() {
   handleThemeToggle();
 }
 
+function setThemeMode(value: boolean) {
+  if (isAltTheme.value === value) {
+    return;
+  }
+
+  isAltTheme.value = value;
+  handleThemeToggle();
+}
+
+function setWallpaper(value: WallpaperVariant) {
+  if (wallpaperVariant.value === value) {
+    return;
+  }
+
+  wallpaperVariant.value = value;
+  notify('Wallpaper actualizado', `El fondo cambio a ${value}.`, {
+    kind: 'success',
+    sourceId: 'settings',
+    sourceLabel: 'Settings',
+  });
+}
+
+function saveProfileSettings() {
+  const normalizedName = profileDraft.value.name.trim() || props.userName;
+  const normalizedEmail = profileDraft.value.email.trim() || props.userEmail;
+
+  profileDraft.value = {
+    name: normalizedName,
+    email: normalizedEmail,
+  };
+
+  const welcomeWindow = windows.value.find((item) => item.id === 'welcome');
+  if (welcomeWindow) {
+    welcomeWindow.title = `Bienvenido ${normalizedName}`;
+    welcomeWindow.description = `Sesion de ${normalizedEmail} lista. Puedes abrir apps desde el launcher, mover ventanas y usar clic derecho sobre el fondo.`;
+  }
+
+  notify('Perfil actualizado', `Se guardaron los datos locales de ${normalizedName}.`, {
+    kind: 'success',
+    sourceId: 'settings',
+    sourceLabel: 'Settings',
+  });
+}
+
 function notifyNotificationCenter() {
-  notify('Notifications', 'El centro de notificaciones estara disponible en una siguiente iteracion.');
+  openNotificationCenter();
 }
 
 function sendChatMessage() {
@@ -1057,13 +1420,26 @@ function handleKeydown(event: KeyboardEvent) {
       closeLauncher();
     } else {
       openLauncher();
-      notify('Launcher', 'Launcher abierto con atajo de teclado.');
+      notify('Launcher', 'Launcher abierto con atajo de teclado.', {
+        kind: 'info',
+        sourceId: 'launcher',
+        sourceLabel: 'Launcher',
+      });
     }
   }
 
   if (event.key === 'Escape' && isLauncherOpen.value) {
     closeLauncher();
   }
+}
+
+function formatNotificationTime(value: string) {
+  return new Intl.DateTimeFormat('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: 'short',
+  }).format(new Date(value));
 }
 
 function handleResizeMove(event: MouseEvent) {

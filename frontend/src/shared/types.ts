@@ -26,3 +26,11 @@ export interface DesktopKernelState {
     satisfaction: number;
   };
 }
+
+export interface ServiceAlert {
+  id: number;
+  service: string;
+  title: string;
+  message: string;
+  createdAt: string;
+}

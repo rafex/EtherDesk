@@ -1,11 +1,6 @@
-import type { DesktopKernelState, FeedbackSubmission, NotesDraftSnapshot, SessionUser, TerminalSessionSnapshot } from '@/shared/types';
+import type { DesktopKernelState, DesktopPreferences, FeedbackSubmission, KernelMonitorState, NotesDraftSnapshot, SessionEnvelope, TerminalSessionSnapshot } from '@/shared/types';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-
-interface KernelAuthResponse {
-  token: string;
-  user: SessionUser;
-}
 
 function createKernelRequest(getToken: () => string | null) {
   return async function kernelRequest<T>(path: string, init: RequestInit = {}) {
@@ -36,14 +31,20 @@ export function createEtherDeskKernel(getToken: () => string | null) {
 
   return {
     login(email: string, password: string) {
-      return request<KernelAuthResponse>('/api/auth/login', {
+      return request<SessionEnvelope>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
     },
     restoreSession() {
-      return request<KernelAuthResponse>('/api/auth/session', {
+      return request<SessionEnvelope>('/api/auth/session', {
         method: 'GET',
+      });
+    },
+    refreshSession() {
+      return request<SessionEnvelope>('/api/auth/refresh', {
+        method: 'POST',
+        body: JSON.stringify({}),
       });
     },
     loadDesktop() {
@@ -67,6 +68,59 @@ export function createEtherDeskKernel(getToken: () => string | null) {
       return request<{ updatedAt: string }>('/api/os/terminal/sync', {
         method: 'POST',
         body: JSON.stringify(snapshot),
+      });
+    },
+    updatePreferences(preferences: Partial<DesktopPreferences>) {
+      return request<DesktopPreferences>('/api/os/preferences', {
+        method: 'POST',
+        body: JSON.stringify(preferences),
+      });
+    },
+    executeTerminalCommand(command: string) {
+      return request<{ ok: boolean; output: string[] }>('/api/os/terminal/execute', {
+        method: 'POST',
+        body: JSON.stringify({ command }),
+      });
+    },
+    renameWorkspaceFile(fileId: string, name: string) {
+      return request<{ id: string; name: string; type: 'notes' | 'terminal'; updatedAt: string }>('/api/os/files/rename', {
+        method: 'POST',
+        body: JSON.stringify({ fileId, name }),
+      });
+    },
+    createWorkspaceFile(type: 'notes' | 'terminal', name: string) {
+      return request<{ id: string; name: string; type: 'notes' | 'terminal'; updatedAt: string } | null>('/api/os/files/create', {
+        method: 'POST',
+        body: JSON.stringify({ type, name }),
+      });
+    },
+    activateWorkspaceFile(fileId: string) {
+      return request<{ id: string; name: string; type: 'notes' | 'terminal'; updatedAt: string }>('/api/os/files/activate', {
+        method: 'POST',
+        body: JSON.stringify({ fileId }),
+      });
+    },
+    duplicateWorkspaceFile(fileId: string) {
+      return request<{ id: string; name: string; type: 'notes' | 'terminal'; updatedAt: string }>('/api/os/files/duplicate', {
+        method: 'POST',
+        body: JSON.stringify({ fileId }),
+      });
+    },
+    deleteWorkspaceFile(fileId: string) {
+      return request<{ success: boolean }>('/api/os/files/delete', {
+        method: 'POST',
+        body: JSON.stringify({ fileId }),
+      });
+    },
+    updateProfile(name: string, email: string) {
+      return request<{ id: string; name: string; email: string; role: string }>('/api/os/account/profile', {
+        method: 'POST',
+        body: JSON.stringify({ name, email }),
+      });
+    },
+    loadMonitor() {
+      return request<KernelMonitorState>('/api/os/monitor', {
+        method: 'GET',
       });
     },
     logout() {

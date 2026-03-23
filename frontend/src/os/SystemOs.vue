@@ -13,10 +13,22 @@
     :user-email="user?.email ?? 'demo@rafex.dev'"
     :initial-rating="desktopRating"
     :os-version="osVersion"
+    :preferences="preferences"
+    :monitor-state="monitor"
+    :session-expires-at="sessionExpiresAt"
     :service-alerts="serviceAlerts"
+    :execute-terminal-command="executeTerminalCommand"
+    :update-profile="handleUpdateProfile"
+    :create-workspace-file="handleCreateWorkspaceFile"
+    :activate-workspace-file="handleActivateWorkspaceFile"
+    :duplicate-workspace-file="handleDuplicateWorkspaceFile"
+    :rename-workspace-file="handleRenameWorkspaceFile"
+    :delete-workspace-file="handleDeleteWorkspaceFile"
     @logout="handleLogout"
     @rate="handleRate"
+    @update-preferences="handlePreferencesUpdate"
     @consume-service-alert="handleConsumeServiceAlert"
+    @refresh-monitor="handleRefreshMonitor"
   />
 </template>
 
@@ -27,11 +39,12 @@ import LoginScreen from '@/os/LoginScreen.vue';
 import { useSystemSession } from '@/os/useSystemSession';
 import { addOfflineSyncListener, announceOfflineSyncComplete, flushOfflineQueue, queueOfflineAction } from '@/os/offline';
 import DesktopShell from '@/shell/DesktopShell.vue';
-import type { FeedbackSubmission, ServiceAlert } from '@/shared/types';
+import { saveNotesDraft, saveTerminalSnapshot } from '@/os/offline';
+import type { DesktopPreferences, FeedbackSubmission, ServiceAlert } from '@/shared/types';
 
 const BOOT_DELAY_MS = 1800;
 
-const { user, apps, isAuthenticated, login, logout, restoreSession, loadDesktop, submitSatisfaction, syncNotes, syncTerminal } = useSystemSession();
+const { user, apps, preferences, monitor, workspace, sessionExpiresAt, isAuthenticated, login, logout, restoreSession, refreshSession, loadDesktop, submitSatisfaction, syncNotes, syncTerminal, updatePreferences, executeTerminalCommand, renameWorkspaceFile, createWorkspaceFile, activateWorkspaceFile, duplicateWorkspaceFile, deleteWorkspaceFile, updateProfile, loadMonitor } = useSystemSession();
 const isBooting = ref(false);
 const isSubmittingLogin = ref(false);
 const isRestoringSession = ref(true);
@@ -43,6 +56,52 @@ const nextServiceAlertId = ref(1);
 
 let bootTimer: number | null = null;
 let removeSyncListener: (() => void) | null = null;
+let sessionRefreshTimer: number | null = null;
+
+function clearSessionRefreshTimer() {
+  if (sessionRefreshTimer !== null) {
+    window.clearTimeout(sessionRefreshTimer);
+    sessionRefreshTimer = null;
+  }
+}
+
+function scheduleSessionRefresh() {
+  clearSessionRefreshTimer();
+
+  if (!sessionExpiresAt.value) {
+    return;
+  }
+
+  const expiresAt = new Date(sessionExpiresAt.value).getTime();
+  const refreshInMs = Math.max(expiresAt - Date.now() - 1000 * 60 * 5, 1000 * 30);
+  sessionRefreshTimer = window.setTimeout(async () => {
+    try {
+      await refreshSession();
+      scheduleSessionRefresh();
+    } catch {
+      await handleLogout();
+    }
+  }, refreshInMs);
+}
+
+function hydrateWorkspaceFromBackend() {
+  workspace.value?.notesFiles?.forEach((file) => {
+    saveNotesDraft(file.id, file.name, file.content, file.updatedAt, file.updatedAt);
+  });
+
+  workspace.value?.terminalFiles?.forEach((file) => {
+    saveTerminalSnapshot(
+      {
+        fileId: file.id,
+        name: file.name,
+        history: file.history,
+        log: file.log,
+      },
+      file.updatedAt,
+      file.updatedAt,
+    );
+  });
+}
 
 async function syncPendingOfflineActions() {
   if (!isAuthenticated.value || !navigator.onLine) {
@@ -84,6 +143,9 @@ async function bootDesktop() {
   const desktopState = await loadDesktop();
   desktopRating.value = desktopState.preferences.satisfaction;
   osVersion.value = desktopState.kernel.version;
+  hydrateWorkspaceFromBackend();
+  await loadMonitor();
+  scheduleSessionRefresh();
   await syncPendingOfflineActions();
 
   bootTimer = window.setTimeout(() => {
@@ -108,6 +170,7 @@ async function handleLogin(credentials: { email: string; password: string }) {
 
 async function handleLogout() {
   clearBootTimer();
+  clearSessionRefreshTimer();
   isBooting.value = false;
   loginError.value = '';
   desktopRating.value = 0;
@@ -149,8 +212,143 @@ function handleConsumeServiceAlert(alertId: number) {
   serviceAlerts.value = serviceAlerts.value.filter((alert) => alert.id !== alertId);
 }
 
+async function handlePreferencesUpdate(patch: Partial<DesktopPreferences>) {
+  try {
+    await updatePreferences(patch);
+    await loadMonitor();
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.preferences',
+      title: 'Fallo al guardar preferencias',
+      message: error instanceof Error ? error.message : 'No fue posible guardar las preferencias del desktop.',
+      createdAt: new Date().toISOString(),
+    });
+  }
+}
+
+async function handleRefreshMonitor() {
+  try {
+    await loadMonitor();
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.monitor',
+      title: 'Fallo al cargar monitor',
+      message: error instanceof Error ? error.message : 'No fue posible cargar el estado del kernel.',
+      createdAt: new Date().toISOString(),
+    });
+  }
+}
+
+async function handleRenameWorkspaceFile(fileId: string, name: string) {
+  try {
+    const result = await renameWorkspaceFile(fileId, name);
+    await loadMonitor();
+    return result;
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.files.rename',
+      title: 'Fallo al renombrar archivo',
+      message: error instanceof Error ? error.message : 'No fue posible renombrar el archivo del workspace.',
+      createdAt: new Date().toISOString(),
+    });
+    throw error;
+  }
+}
+
+async function handleCreateWorkspaceFile(type: 'notes' | 'terminal', name: string) {
+  try {
+    const result = await createWorkspaceFile(type, name);
+    await loadMonitor();
+    hydrateWorkspaceFromBackend();
+    return result;
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.files.create',
+      title: 'Fallo al crear archivo',
+      message: error instanceof Error ? error.message : 'No fue posible crear el archivo virtual del workspace.',
+      createdAt: new Date().toISOString(),
+    });
+    throw error;
+  }
+}
+
+async function handleActivateWorkspaceFile(fileId: string) {
+  try {
+    const result = await activateWorkspaceFile(fileId);
+    await loadDesktop();
+    hydrateWorkspaceFromBackend();
+    await loadMonitor();
+    return result;
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.files.activate',
+      title: 'Fallo al abrir archivo',
+      message: error instanceof Error ? error.message : 'No fue posible activar el archivo del workspace.',
+      createdAt: new Date().toISOString(),
+    });
+    throw error;
+  }
+}
+
+async function handleDuplicateWorkspaceFile(fileId: string) {
+  try {
+    const result = await duplicateWorkspaceFile(fileId);
+    await loadMonitor();
+    hydrateWorkspaceFromBackend();
+    return result;
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.files.duplicate',
+      title: 'Fallo al duplicar archivo',
+      message: error instanceof Error ? error.message : 'No fue posible duplicar el archivo del workspace.',
+      createdAt: new Date().toISOString(),
+    });
+    throw error;
+  }
+}
+
+async function handleDeleteWorkspaceFile(fileId: string) {
+  try {
+    const result = await deleteWorkspaceFile(fileId);
+    await loadMonitor();
+    hydrateWorkspaceFromBackend();
+    return result;
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.files.delete',
+      title: 'Fallo al eliminar archivo',
+      message: error instanceof Error ? error.message : 'No fue posible eliminar el archivo del workspace.',
+      createdAt: new Date().toISOString(),
+    });
+    throw error;
+  }
+}
+
+async function handleUpdateProfile(name: string, email: string) {
+  try {
+    return await updateProfile(name, email);
+  } catch (error) {
+    serviceAlerts.value.push({
+      id: nextServiceAlertId.value++,
+      service: 'os.account.profile',
+      title: 'Fallo al actualizar perfil',
+      message: error instanceof Error ? error.message : 'No fue posible actualizar el perfil del usuario.',
+      createdAt: new Date().toISOString(),
+    });
+    throw error;
+  }
+}
+
 onBeforeUnmount(() => {
   clearBootTimer();
+  clearSessionRefreshTimer();
   removeSyncListener?.();
   window.removeEventListener('online', syncPendingOfflineActions);
 });

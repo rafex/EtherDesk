@@ -18,6 +18,12 @@
     <path d="M8 10l2.8 2.4L8 14.8M12.8 15h3.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
   </svg>
 
+  <svg v-else-if="icon === 'ide'" viewBox="0 0 24 24" aria-hidden="true">
+    <title v-if="label">{{ label }}</title>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.7" />
+    <path d="M8 10.5 10.8 13 8 15.5M13.5 16h2.8M13.5 9.5h3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+
   <svg v-else-if="icon === 'launcher'" viewBox="0 0 24 24" aria-hidden="true">
     <title v-if="label">{{ label }}</title>
     <rect x="4" y="4" width="7" height="7" rx="2" fill="currentColor" />

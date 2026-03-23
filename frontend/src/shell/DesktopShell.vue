@@ -149,25 +149,35 @@
           </div>
         </div>
 
-        <div class="desktop-launcher__apps">
-          <button
-            v-for="app in filteredApps"
-            :key="app.id"
-            class="desktop-launcher__result"
-            type="button"
-            @click="launchFromLauncher(app.id)"
-          >
-            <span class="desktop-launcher__result-icon">
-              <AppIcon :icon="app.icon" :label="app.name" />
-            </span>
-            <span class="desktop-launcher__result-copy">
-              <strong>{{ app.name }}</strong>
-              <span>{{ app.description }}</span>
-            </span>
-          </button>
+        <div v-for="group in launcherGroups" :key="group.id" class="desktop-launcher__group">
+          <div class="desktop-launcher__group-head">
+            <strong>{{ group.label }}</strong>
+            <span>{{ group.entries.length }}</span>
+          </div>
+
+          <div class="desktop-launcher__apps">
+            <button
+              v-for="entry in group.entries"
+              :key="entry.id"
+              class="desktop-launcher__result"
+              :class="{ 'desktop-launcher__result--web': entry.group === 'web' }"
+              type="button"
+              @click="launchLauncherEntry(entry)"
+            >
+              <span class="desktop-launcher__result-icon">
+                <img v-if="entry.iconUrl" :src="entry.iconUrl" :alt="entry.name" class="desktop-launcher__result-image" />
+                <AppIcon v-else :icon="entry.icon" :label="entry.name" />
+              </span>
+              <span class="desktop-launcher__result-copy">
+                <strong>{{ entry.name }}</strong>
+                <span>{{ entry.description }}</span>
+                <small v-if="entry.meta">{{ entry.meta }}</small>
+              </span>
+            </button>
+          </div>
         </div>
 
-        <p v-if="filteredApps.length === 0" class="desktop-launcher__empty">
+        <p v-if="launcherGroups.length === 0" class="desktop-launcher__empty">
           No hay resultados para "{{ launcherQuery }}".
         </p>
       </div>
@@ -250,13 +260,13 @@
 
             <div class="desktop-browser__head" @mousedown.stop="startDrag($event, windowItem.id)">
               <button class="desktop-browser__nav-btn" type="button">←</button>
-              <button class="desktop-browser__nav-btn" type="button" disabled>→</button>
+                <button class="desktop-browser__nav-btn" type="button" disabled>→</button>
 
               <input
                 v-model="browserAddressDraft"
                 class="desktop-browser__input"
                 type="text"
-                placeholder="rafex.dev o duckduckgo.com"
+                placeholder="rafex.dev, duckduckgo.com o housedb.rafex.app"
                 @keydown.enter.prevent="navigateBrowser"
               />
 
@@ -279,7 +289,7 @@
                 <p class="desktop-browser__page-url">{{ activeBrowserTab?.url }}</p>
                 <h3>Navegacion restringida</h3>
                 <p>{{ activeBrowserMessage }}</p>
-                <p>Sitios permitidos: `rafex.dev` y `duckduckgo.com`.</p>
+                <p>Sitios permitidos: {{ allowedBrowserHostsLabel }}.</p>
               </div>
             </div>
           </div>
@@ -407,6 +417,19 @@
               </div>
 
               <div class="desktop-settings__group">
+                <span class="desktop-settings__label">Dominios permitidos del browser</span>
+                <label class="desktop-settings__field">
+                  <span>Hosts separados por coma</span>
+                  <input v-model="browserHostsDraft" type="text" placeholder="rafex.dev, duckduckgo.com, housedb.rafex.app" />
+                </label>
+                <div class="desktop-settings__actions">
+                  <button class="desktop-settings__save" type="button" :disabled="isSavingPreferences" @click="saveBrowserHosts">
+                    {{ isSavingPreferences ? 'Guardando...' : 'Guardar dominios del browser' }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="desktop-settings__group">
                 <span class="desktop-settings__label">Tamano por defecto de ventanas</span>
                 <label class="desktop-settings__field">
                   <span>Ancho (px)</span>
@@ -417,8 +440,8 @@
                   <input v-model.number="windowDefaultsDraft.height" type="number" :min="MIN_WINDOW_HEIGHT" step="10" />
                 </label>
                 <div class="desktop-settings__actions">
-                  <button class="desktop-settings__save" type="button" @click="saveWindowDefaults">
-                    Guardar tamano por defecto
+                  <button class="desktop-settings__save" type="button" :disabled="isSavingPreferences" @click="saveWindowDefaults">
+                    {{ isSavingPreferences ? 'Guardando...' : 'Guardar tamano por defecto' }}
                   </button>
                 </div>
               </div>
@@ -457,14 +480,22 @@
           </div>
 
           <div v-else-if="windowItem.appId === 'notes'" class="desktop-app-surface">
-            <NotesEditor :theme-mode="isAltTheme ? 'sand' : 'ocean'" />
+            <NotesEditor :file-id="activeNotesFileId" :file-name="activeNotesFileName" :theme-mode="isAltTheme ? 'sand' : 'ocean'" />
+          </div>
+
+          <div v-else-if="windowItem.appId === 'ide'" class="desktop-app-surface">
+            <IdeEditor :file-id="activeNotesFileId" :file-name="activeNotesFileName" :theme-mode="isAltTheme ? 'sand' : 'ocean'" />
           </div>
 
           <div v-else-if="windowItem.appId === 'terminal'" class="desktop-app-surface">
             <TerminalPane
               :apps="props.apps.map((app) => app.name)"
+              :execute-command="executeTerminalCommand"
+              :session-id="activeTerminalFileId"
+              :session-name="activeTerminalFileName"
               :theme-mode="isAltTheme ? 'sand' : 'ocean'"
               :user-name="profileDraft.name"
+              :after-command="refreshMonitor"
             />
           </div>
 
@@ -475,11 +506,13 @@
             </div>
 
             <div class="desktop-notification-center__list">
-              <article
+              <button
                 v-for="group in groupedRecentNotifications"
                 :key="group.id"
                 class="desktop-notification-center__item"
                 :class="`desktop-notification-center__item--${group.kind}`"
+                type="button"
+                @click="openNotificationTarget(group.sourceId, group.targetAppId, group.targetUrl)"
               >
                 <div class="desktop-notification-center__item-head">
                   <strong>{{ group.title }}</strong>
@@ -490,7 +523,7 @@
                   <span>{{ group.sourceLabel }}</span>
                   <span v-if="group.count > 1">{{ group.count }} eventos</span>
                 </div>
-              </article>
+              </button>
 
               <p v-if="groupedRecentNotifications.length === 0" class="desktop-notification-center__empty">
                 No hay notificaciones recientes.
@@ -511,8 +544,14 @@
 
           <div v-else-if="windowItem.appId === 'files'" class="desktop-files">
             <div class="desktop-files__header">
-              <p class="desktop-window__eyebrow">Workspace</p>
-              <h2>Archivos locales</h2>
+              <div>
+                <p class="desktop-window__eyebrow">Workspace</p>
+                <h2>Archivos locales</h2>
+              </div>
+              <div class="desktop-settings__actions">
+                <button type="button" @click="createWorkspaceFile('notes')">Nuevo note</button>
+                <button type="button" @click="createWorkspaceFile('terminal')">Nueva sesion</button>
+              </div>
             </div>
             <div class="desktop-files__list">
               <article
@@ -529,7 +568,10 @@
                   </div>
                 </div>
                 <div class="desktop-files__actions">
-                  <button type="button" :disabled="!file.exists" @click="openLocalFile(file.id)">Abrir</button>
+                  <button v-if="file.type === 'notes'" type="button" :disabled="!file.exists" @click="openLocalFile(file.id, 'notes')">Notes</button>
+                  <button v-if="file.type === 'notes'" type="button" :disabled="!file.exists" @click="openLocalFile(file.id, 'ide')">IDE</button>
+                  <button v-if="file.type === 'terminal'" type="button" :disabled="!file.exists" @click="openLocalFile(file.id, 'terminal')">Abrir</button>
+                  <button type="button" @click="duplicateLocalFile(file.id)">Duplicar</button>
                   <button type="button" @click="renameLocalFile(file.id)">Renombrar</button>
                   <button type="button" :disabled="!file.exists" @click="deleteLocalFile(file.id)">Borrar</button>
                 </div>
@@ -549,7 +591,7 @@
               </article>
               <article class="desktop-monitor__card">
                 <span>Kernel</span>
-                <strong>etherdesk-kernel {{ props.osVersion }}</strong>
+                <strong>{{ props.monitorState?.kernel.name ?? 'etherdesk-kernel' }} {{ props.monitorState?.kernel.version ?? props.osVersion }}</strong>
               </article>
               <article class="desktop-monitor__card">
                 <span>Sesion</span>
@@ -563,6 +605,21 @@
                 <span>PWA</span>
                 <strong>{{ displayModeLabel }}</strong>
               </article>
+              <article class="desktop-monitor__card">
+                <span>Archivos sincronizados</span>
+                <strong>{{ props.monitorState?.metrics.files ?? backendFiles.length }}</strong>
+              </article>
+              <article class="desktop-monitor__card">
+                <span>Eventos del kernel</span>
+                <strong>{{ props.monitorState?.metrics.events ?? monitorEvents.length }}</strong>
+              </article>
+              <article class="desktop-monitor__card">
+                <span>Apps registradas</span>
+                <strong>{{ props.monitorState?.metrics.registeredApps ?? props.apps.length }}</strong>
+              </article>
+            </div>
+            <div class="desktop-settings__actions desktop-settings__actions--monitor">
+              <button class="desktop-settings__save" type="button" @click="refreshMonitor">Actualizar monitor</button>
             </div>
           </div>
 
@@ -574,6 +631,7 @@
                 <h2>{{ profileDraft.name }}</h2>
                 <p>{{ profileDraft.email }}</p>
                 <p>EtherDesk OS {{ props.osVersion }}</p>
+                <p>Sesion expira: {{ sessionExpirationLabel }}</p>
               </div>
             </div>
             <div class="desktop-account__actions">
@@ -589,7 +647,11 @@
                 <strong>{{ task.type }}</strong>
                 <span>{{ task.count }} pendiente(s)</span>
               </article>
-              <p v-if="pendingTaskGroups.length === 0" class="desktop-tasks__empty">No hay trabajos pendientes por sincronizar.</p>
+              <article v-for="event in monitorEvents.slice(0, 5)" :key="event.id" class="desktop-tasks__item">
+                <strong>{{ event.type }}</strong>
+                <span>{{ event.message }}</span>
+              </article>
+              <p v-if="pendingTaskGroups.length === 0 && monitorEvents.length === 0" class="desktop-tasks__empty">No hay trabajos pendientes por sincronizar.</p>
             </div>
           </div>
 
@@ -598,7 +660,7 @@
             <h2>Ayuda rapida</h2>
             <ul class="desktop-help__list">
               <li>`Cmd/Ctrl + K` abre el launcher</li>
-              <li>El browser solo permite `rafex.dev` y `duckduckgo.com`</li>
+              <li>El browser solo permite los hosts configurados por el sistema</li>
               <li>Notes y Terminal guardan localmente si estas offline</li>
               <li>Las tareas pendientes se ven en `Tasks`</li>
               <li>Usa `Settings` para resetear datos de la PWA</li>
@@ -772,10 +834,11 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AppIcon from '@/shared/AppIcon.vue';
-import { addOfflineStateListener, readNotesDraft, readOfflineQueue, readTerminalSnapshot } from '@/os/offline';
-import type { AppShortcut, FeedbackSubmission, ServiceAlert } from '@/shared/types';
+import { addOfflineStateListener, readNotesDraft, readOfflineQueue, readTerminalSnapshot, removeNotesDraft, removeTerminalSnapshot } from '@/os/offline';
+import type { AppShortcut, DesktopPreferences, FeedbackSubmission, KernelMonitorState, ServiceAlert } from '@/shared/types';
 
 const NotesEditor = defineAsyncComponent(() => import('@/editor/NotesEditor.vue'));
+const IdeEditor = defineAsyncComponent(() => import('@/editor/IdeEditor.vue'));
 const TerminalPane = defineAsyncComponent(() => import('@/terminal/TerminalPane.vue'));
 
 interface DesktopWindow {
@@ -812,6 +875,8 @@ interface DesktopNotification {
   sourceLabel: string;
   createdAt: string;
   isToastVisible: boolean;
+  targetAppId?: string;
+  targetUrl?: string;
 }
 
 interface ChatMessage {
@@ -819,6 +884,19 @@ interface ChatMessage {
   author: 'user' | 'assistant';
   text: string;
   time: string;
+}
+
+interface LauncherEntry {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  appId: string;
+  route?: string;
+  targetUrl?: string;
+  iconUrl?: string;
+  meta?: string;
+  group: 'apps' | 'web';
 }
 
 interface FeedbackDialogState {
@@ -860,13 +938,25 @@ const props = defineProps<{
   userEmail: string;
   initialRating: number;
   osVersion: string;
+  preferences: DesktopPreferences | null;
+  monitorState: KernelMonitorState | null;
+  sessionExpiresAt: string | null;
   serviceAlerts: ServiceAlert[];
+  executeTerminalCommand: (command: string) => Promise<{ ok: boolean; output: string[] }>;
+  updateProfile: (name: string, email: string) => Promise<{ id: string; name: string; email: string; role: string }>;
+  createWorkspaceFile: (type: 'notes' | 'terminal', name: string) => Promise<{ id: string; name: string; type: 'notes' | 'terminal'; updatedAt: string } | null>;
+  activateWorkspaceFile: (fileId: string) => Promise<{ id: string; name: string; type: 'notes' | 'terminal'; updatedAt: string }>;
+  duplicateWorkspaceFile: (fileId: string) => Promise<{ id: string; name: string; type: 'notes' | 'terminal'; updatedAt: string }>;
+  renameWorkspaceFile: (fileId: string, name: string) => Promise<{ id: string; name: string; type: 'notes' | 'terminal'; updatedAt: string }>;
+  deleteWorkspaceFile: (fileId: string) => Promise<{ success: boolean }>;
 }>();
 
 const emit = defineEmits<{
   logout: [];
   rate: [feedback: FeedbackSubmission];
+  'update-preferences': [patch: Partial<DesktopPreferences>];
   'consume-service-alert': [alertId: number];
+  'refresh-monitor': [];
 }>();
 
 const desktopRef = ref<HTMLElement | null>(null);
@@ -905,6 +995,7 @@ const profileDraft = ref({
   email: props.userEmail,
 });
 const windowDefaultsDraft = ref(readStoredWindowDefaults());
+const browserHostsDraft = ref('');
 const wallpaperOptions: Array<{ id: WallpaperVariant; label: string }> = [
   { id: 'ocean', label: 'Oceano' },
   { id: 'sunset', label: 'Sunset' },
@@ -961,6 +1052,7 @@ const windows = ref<DesktopWindow[]>([
 ]);
 const fileEntries = ref<LocalFileItem[]>([]);
 const offlineStateTick = ref(0);
+const isSavingPreferences = ref(false);
 
 const visibleWindows = computed(() => windows.value.filter((windowItem) => !windowItem.isMinimized));
 const minimizedWindows = computed(() => windows.value.filter((windowItem) => windowItem.isMinimized));
@@ -971,6 +1063,10 @@ const activeBrowserTab = computed(() => {
 const activeBrowserSrc = computed(() => {
   const url = activeBrowserTab.value?.url ?? '';
   return resolveAllowedBrowserUrl(url);
+});
+const allowedBrowserHostsLabel = computed(() => {
+  const browserApp = props.apps.find((app) => app.id === 'browser');
+  return (browserApp?.allowedHosts ?? ['rafex.dev', 'duckduckgo.com', 'housedb.rafex.app']).join(', ');
 });
 const activeBrowserMessage = computed(() => {
   const url = activeBrowserTab.value?.url ?? '';
@@ -983,7 +1079,7 @@ const activeBrowserMessage = computed(() => {
 });
 const groupedRecentNotifications = computed(() => {
   const recent = notifications.value.slice(0, 7);
-  const grouped = new Map<string, { id: string; kind: DesktopNotification['kind']; sourceLabel: string; title: string; description: string; count: number; createdAt: string }>();
+  const grouped = new Map<string, { id: string; kind: DesktopNotification['kind']; sourceLabel: string; title: string; description: string; count: number; createdAt: string; targetAppId?: string; targetUrl?: string }>();
 
   recent.forEach((notification) => {
     const groupKey = `${notification.sourceId}:${notification.kind}`;
@@ -994,6 +1090,8 @@ const groupedRecentNotifications = computed(() => {
       existing.title = notification.title;
       existing.description = notification.description;
       existing.createdAt = notification.createdAt;
+      existing.targetAppId = notification.targetAppId;
+      existing.targetUrl = notification.targetUrl;
       return;
     }
 
@@ -1005,6 +1103,8 @@ const groupedRecentNotifications = computed(() => {
       description: notification.description,
       count: 1,
       createdAt: notification.createdAt,
+      targetAppId: notification.targetAppId,
+      targetUrl: notification.targetUrl,
     });
   });
 
@@ -1020,6 +1120,65 @@ const filteredApps = computed(() => {
   return props.apps.filter((app) => {
     return `${app.name} ${app.description}`.toLowerCase().includes(normalizedQuery);
   });
+});
+const launcherEntries = computed<LauncherEntry[]>(() => {
+  const entries = filteredApps.value.map((app) => ({
+    id: app.id,
+    name: app.name,
+    description: app.description,
+    icon: app.icon,
+    appId: app.id,
+    route: app.route,
+    group: 'apps' as const,
+  }));
+  const normalizedQuery = launcherQuery.value.trim().toLowerCase();
+  const browserApp = props.apps.find((app) => app.id === 'browser');
+  const allowedHosts = browserApp?.allowedHosts ?? [];
+  if (!normalizedQuery) {
+    return entries;
+  }
+
+  const browserTarget = allowedHosts.find((host) => normalizedQuery.includes(host) || host.includes(normalizedQuery));
+  if (browserTarget) {
+    const browserTargetMeta = resolveBrowserTargetMeta(browserTarget);
+    entries.unshift({
+      id: `browser-target-${browserTarget}`,
+      name: browserTargetMeta.title,
+      description: browserTargetMeta.description,
+      icon: browserApp?.icon ?? 'browser',
+      appId: 'browser',
+      route: browserApp?.route,
+      targetUrl: browserTarget,
+      iconUrl: browserTargetMeta.iconUrl,
+      meta: browserTarget,
+      group: 'web' as const,
+    });
+  }
+
+  return entries;
+});
+const launcherGroups = computed(() => {
+  const appEntries = launcherEntries.value.filter((entry) => entry.group === 'apps');
+  const webEntries = launcherEntries.value.filter((entry) => entry.group === 'web');
+  const groups: Array<{ id: string; label: string; entries: LauncherEntry[] }> = [];
+
+  if (appEntries.length > 0) {
+    groups.push({
+      id: 'apps',
+      label: 'Apps',
+      entries: appEntries,
+    });
+  }
+
+  if (webEntries.length > 0) {
+    groups.push({
+      id: 'web',
+      label: 'Web permitida',
+      entries: webEntries,
+    });
+  }
+
+  return groups;
 });
 const activeRatingValue = computed(() => (feedbackDialog.value.visible ? feedbackDialog.value.rating : desktopRating.value));
 const feedbackChipOptions = computed(() => {
@@ -1051,6 +1210,24 @@ const pendingTaskGroups = computed(() => {
 });
 const serviceWorkerStatus = ref('checking');
 const displayModeLabel = ref('browser');
+const backendFiles = computed(() => props.monitorState?.workspace.files ?? []);
+const monitorEvents = computed(() => props.monitorState?.events ?? []);
+const sessionExpirationLabel = computed(() => {
+  if (!props.sessionExpiresAt) {
+    return 'Sin expiracion disponible';
+  }
+
+  return new Intl.DateTimeFormat('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(props.sessionExpiresAt));
+});
+const activeNotesFileName = computed(() => props.monitorState?.workspace.notes?.name ?? 'notes.md');
+const activeNotesFileId = computed(() => props.monitorState?.workspace.notes?.id ?? 'notes-file');
+const activeTerminalFileName = computed(() => props.monitorState?.workspace.terminal?.name ?? 'terminal-session.log');
+const activeTerminalFileId = computed(() => props.monitorState?.workspace.terminal?.id ?? 'terminal-file');
 const userInitials = computed(() => {
   return profileDraft.value.name
     .split(' ')
@@ -1073,6 +1250,25 @@ watch(
   ([name, email]) => {
     profileDraft.value = { name, email };
   },
+);
+
+watch(
+  () => props.preferences,
+  (preferences) => {
+    if (!preferences) {
+      return;
+    }
+
+    isAltTheme.value = preferences.theme === 'sand';
+    wallpaperVariant.value = preferences.wallpaper;
+    windowDefaultsDraft.value = {
+      width: preferences.defaultWindowSize.width,
+      height: preferences.defaultWindowSize.height,
+    };
+    browserHostsDraft.value = preferences.browserAllowedHosts.join(', ');
+    desktopRating.value = preferences.satisfaction;
+  },
+  { immediate: true, deep: true },
 );
 
 watch(
@@ -1123,6 +1319,14 @@ watch(
   { deep: true },
 );
 
+watch(
+  () => props.monitorState,
+  () => {
+    refreshLocalWorkspace();
+  },
+  { deep: true },
+);
+
 let dragState:
   | {
       id: string;
@@ -1145,6 +1349,9 @@ let clockTimer: number | null = null;
 let removeOnlineListener: (() => void) | null = null;
 let removeOfflineListener: (() => void) | null = null;
 let removeOfflineStateListener: (() => void) | null = null;
+const hashChangeHandler = () => {
+  void handleHashChange();
+};
 
 function syncLauncherClock() {
   const now = new Date();
@@ -1160,25 +1367,16 @@ function syncLauncherClock() {
 }
 
 function refreshLocalWorkspace() {
-  const notesDraft = readNotesDraft();
-  const terminalSnapshot = readTerminalSnapshot();
-
-  fileEntries.value = [
-    {
-      id: 'notes-file',
-      name: 'notes.md',
-      type: 'notes',
-      updatedAt: notesDraft?.updatedAt ?? '',
-      exists: Boolean(notesDraft),
-    },
-    {
-      id: 'terminal-file',
-      name: 'terminal-session.log',
-      type: 'terminal',
-      updatedAt: terminalSnapshot?.updatedAt ?? '',
-      exists: Boolean(terminalSnapshot),
-    },
-  ];
+  fileEntries.value = backendFiles.value.map((file) => ({
+    id: file.id,
+    name: file.name,
+    type: file.type,
+    updatedAt:
+      file.type === 'notes'
+        ? readNotesDraft(file.id)?.updatedAt ?? file.updatedAt
+        : readTerminalSnapshot(file.id)?.updatedAt ?? file.updatedAt,
+    exists: true,
+  }));
 }
 
 function updateConnectionStatus() {
@@ -1197,6 +1395,14 @@ async function updateServiceWorkerStatus() {
 
 function updateDisplayMode() {
   displayModeLabel.value = window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser';
+}
+
+async function refreshMonitor() {
+  emit('refresh-monitor');
+}
+
+async function executeTerminalCommand(command: string) {
+  return props.executeTerminalCommand(command);
 }
 
 function openFeedbackDialog(value: number) {
@@ -1254,12 +1460,27 @@ function renameLocalFile(fileId: string) {
     return;
   }
 
-  file.name = nextName;
-  notify('Archivo renombrado', `${nextName} actualizado localmente.`, {
-    kind: 'success',
-    sourceId: 'files',
-    sourceLabel: 'Files',
-  });
+  void props
+    .renameWorkspaceFile(file.id, nextName)
+    .then(() => {
+      refreshLocalWorkspace();
+      notify('Archivo renombrado', `${nextName} actualizado en el workspace.`, {
+        kind: 'success',
+        sourceId: 'files',
+        sourceLabel: 'Files',
+      });
+    })
+    .catch((error) => {
+      notify(
+        'No fue posible renombrar el archivo',
+        error instanceof Error ? error.message : 'El backend rechazo la operacion.',
+        {
+          kind: 'error',
+          sourceId: 'files',
+          sourceLabel: 'Files',
+        },
+      );
+    });
 }
 
 function deleteLocalFile(fileId: string) {
@@ -1268,27 +1489,150 @@ function deleteLocalFile(fileId: string) {
     return;
   }
 
-  if (file.type === 'notes') {
-    window.localStorage.removeItem('etherdesk.notes.draft');
-  } else if (file.type === 'terminal') {
-    window.localStorage.removeItem('etherdesk.terminal.snapshot');
-  }
+  void props
+    .deleteWorkspaceFile(file.id)
+    .then(() => {
+      if (file.type === 'notes') {
+        removeNotesDraft(file.id);
+      } else if (file.type === 'terminal') {
+        removeTerminalSnapshot(file.id);
+      }
 
-  refreshLocalWorkspace();
-  notify('Archivo eliminado', `${file.name} fue eliminado del almacenamiento local.`, {
-    kind: 'info',
-    sourceId: 'files',
-    sourceLabel: 'Files',
-  });
+      refreshLocalWorkspace();
+      notify('Archivo eliminado', `${file.name} fue eliminado del workspace.`, {
+        kind: 'info',
+        sourceId: 'files',
+        sourceLabel: 'Files',
+      });
+    })
+    .catch((error) => {
+      notify(
+        'No fue posible eliminar el archivo',
+        error instanceof Error ? error.message : 'El backend rechazo la operacion.',
+        {
+          kind: 'error',
+          sourceId: 'files',
+          sourceLabel: 'Files',
+        },
+      );
+    });
 }
 
-function openLocalFile(fileId: string) {
+function duplicateLocalFile(fileId: string) {
   const file = fileEntries.value.find((item) => item.id === fileId);
   if (!file) {
     return;
   }
 
-  openAppWindow(file.type === 'notes' ? 'notes' : 'terminal');
+  void props
+    .duplicateWorkspaceFile(file.id)
+    .then((duplicate) => {
+      refreshLocalWorkspace();
+      notify('Archivo duplicado', `${file.name} fue duplicado como ${duplicate.name}.`, {
+        kind: 'success',
+        sourceId: 'files',
+        sourceLabel: 'Files',
+      });
+    })
+    .catch((error) => {
+      notify(
+        'No fue posible duplicar el archivo',
+        error instanceof Error ? error.message : 'El backend rechazo la duplicacion del archivo.',
+        {
+          kind: 'error',
+          sourceId: 'files',
+          sourceLabel: 'Files',
+        },
+      );
+    });
+}
+
+function setWorkspaceDeepLink(targetAppId: 'notes' | 'ide' | 'terminal', fileId: string) {
+  const encodedFileId = encodeURIComponent(fileId);
+  const nextHash = `#/${targetAppId}/${encodedFileId}`;
+  if (window.location.hash !== nextHash) {
+    window.location.hash = nextHash;
+  }
+}
+
+function setAppRouteHash(route: string) {
+  const normalizedRoute = route.startsWith('/') ? route : `/${route}`;
+  const nextHash = `#${normalizedRoute}`;
+  if (window.location.hash !== nextHash) {
+    window.location.hash = nextHash;
+  }
+}
+
+function setBrowserDeepLink(url: string) {
+  const encodedUrl = encodeURIComponent(url);
+  const nextHash = `#/apps/browser?url=${encodedUrl}`;
+  if (window.location.hash !== nextHash) {
+    window.location.hash = nextHash;
+  }
+}
+
+function openBrowserUrl(url: string) {
+  const resolvedUrl = resolveAllowedBrowserUrl(url);
+  if (!resolvedUrl) {
+    const browserApp = props.apps.find((app) => app.id === 'browser');
+    const allowedHosts = (browserApp?.allowedHosts ?? []).join(', ');
+    notify('Navegacion bloqueada', `El navegador solo permite ${allowedHosts || 'hosts configurados por el sistema'}.`, {
+      kind: 'warning',
+      sourceId: 'browser',
+      sourceLabel: 'Browser',
+    });
+    return false;
+  }
+
+  const currentTab = activeBrowserTab.value;
+  if (!currentTab) {
+    return false;
+  }
+
+  currentTab.url = url.trim();
+  currentTab.title = deriveBrowserTitle(url);
+  browserAddressDraft.value = currentTab.url;
+  setBrowserDeepLink(currentTab.url);
+  openAppWindow('browser');
+  notify('Browser', `Cargando ${currentTab.title}.`, {
+    kind: 'info',
+    sourceId: 'browser',
+    sourceLabel: 'Browser',
+    targetAppId: 'browser',
+    targetUrl: currentTab.url,
+  });
+  return true;
+}
+
+function openLocalFile(fileId: string, targetAppId: 'notes' | 'ide' | 'terminal') {
+  const file = fileEntries.value.find((item) => item.id === fileId);
+  if (!file) {
+    return;
+  }
+
+  void props
+    .activateWorkspaceFile(file.id)
+    .then(() => {
+      refreshLocalWorkspace();
+      setWorkspaceDeepLink(targetAppId, file.id);
+      openAppWindow(targetAppId);
+      notify('Archivo activado', `${file.name} se abrio en ${targetAppId === 'ide' ? 'IDE' : targetAppId === 'notes' ? 'Notes' : 'Terminal'}.`, {
+        kind: 'info',
+        sourceId: 'files',
+        sourceLabel: 'Files',
+      });
+    })
+    .catch((error) => {
+      notify(
+        'No fue posible abrir el archivo',
+        error instanceof Error ? error.message : 'El backend rechazo la activacion del archivo.',
+        {
+          kind: 'error',
+          sourceId: 'files',
+          sourceLabel: 'Files',
+        },
+      );
+    });
 }
 
 function buildAvatarDataUrl(name: string, initials: string) {
@@ -1313,6 +1657,46 @@ function buildAvatarDataUrl(name: string, initials: string) {
   `.trim();
 
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function buildHostIconDataUrl(host: string, label: string, background: string) {
+  const safeLabel = label.slice(0, 3).toUpperCase();
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="${host}">
+      <rect width="48" height="48" rx="14" fill="${background}" />
+      <text x="24" y="29" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="white">${safeLabel}</text>
+    </svg>
+  `.trim();
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function resolveBrowserTargetMeta(host: string) {
+  const browserTargets: Record<string, { title: string; description: string; iconUrl: string }> = {
+    'rafex.dev': {
+      title: 'Rafex',
+      description: 'Sitio principal del autor dentro del browser permitido.',
+      iconUrl: buildHostIconDataUrl('rafex.dev', 'R', '#2563eb'),
+    },
+    'duckduckgo.com': {
+      title: 'DuckDuckGo',
+      description: 'Buscador permitido para navegacion dentro del desktop.',
+      iconUrl: buildHostIconDataUrl('duckduckgo.com', 'DDG', '#ea580c'),
+    },
+    'housedb.rafex.app': {
+      title: 'HouseDB',
+      description: 'Acceso permitido al sistema HouseDB desde EtherDesk.',
+      iconUrl: buildHostIconDataUrl('housedb.rafex.app', 'HDB', '#0891b2'),
+    },
+  };
+
+  return (
+    browserTargets[host] ?? {
+      title: host,
+      description: 'Host permitido para el navegador del sistema.',
+      iconUrl: buildHostIconDataUrl(host, host.slice(0, 2), '#475569'),
+    }
+  );
 }
 
 function readStoredWindowDefaults() {
@@ -1594,13 +1978,47 @@ function closeLauncher() {
   isLauncherOpen.value = false;
 }
 
-function launchFromLauncher(appId: string) {
-  openAppWindow(appId);
+function launchFromLauncher(app: AppShortcut, targetUrl?: string) {
+  if (app.id === 'browser' && targetUrl) {
+    void openBrowserUrl(targetUrl);
+    notify('Launcher', 'Aplicacion abierta desde el launcher.', {
+      kind: 'success',
+      sourceId: 'launcher',
+      sourceLabel: 'Launcher',
+      targetAppId: 'browser',
+      targetUrl,
+    });
+    return;
+  } else if (app.id === 'ide' && activeNotesFileId.value) {
+    setWorkspaceDeepLink('ide', activeNotesFileId.value);
+  } else {
+    setAppRouteHash(app.route ?? `/apps/${app.id}`);
+  }
+
+  openAppWindow(app.id);
   notify('Launcher', 'Aplicacion abierta desde el launcher.', {
     kind: 'success',
     sourceId: 'launcher',
     sourceLabel: 'Launcher',
   });
+}
+
+function launchLauncherEntry(entry: LauncherEntry) {
+  const app = props.apps.find((item) => item.id === entry.appId);
+  if (!app) {
+    return;
+  }
+
+  launchFromLauncher(app, entry.targetUrl);
+}
+
+function openNotificationTarget(sourceId: string, targetAppId?: string, targetUrl?: string) {
+  const app = props.apps.find((item) => item.id === (targetAppId ?? sourceId));
+  if (!app) {
+    return;
+  }
+
+  launchFromLauncher(app, targetUrl);
 }
 
 function startDrag(event: MouseEvent, windowId: string) {
@@ -1724,32 +2142,7 @@ function closeBrowserTab(tabId: number) {
 }
 
 function navigateBrowser() {
-  const currentTab = activeBrowserTab.value;
-
-  if (!currentTab) {
-    return;
-  }
-
-  const nextUrl = browserAddressDraft.value.trim();
-  const resolvedUrl = resolveAllowedBrowserUrl(nextUrl);
-
-  currentTab.url = nextUrl;
-  currentTab.title = deriveBrowserTitle(nextUrl);
-
-  if (!resolvedUrl) {
-    notify('Navegacion bloqueada', 'El navegador solo permite rafex.dev y duckduckgo.com.', {
-      kind: 'warning',
-      sourceId: 'browser',
-      sourceLabel: 'Browser',
-    });
-    return;
-  }
-
-  notify('Browser', `Cargando ${currentTab.title}.`, {
-    kind: 'info',
-    sourceId: 'browser',
-    sourceLabel: 'Browser',
-  });
+  void openBrowserUrl(browserAddressDraft.value.trim());
 }
 
 function deriveBrowserTitle(url: string) {
@@ -1767,6 +2160,8 @@ function deriveBrowserTitle(url: string) {
 }
 
 function resolveAllowedBrowserUrl(url: string) {
+  const browserApp = props.apps.find((app) => app.id === 'browser');
+  const allowedHosts = browserApp?.allowedHosts ?? ['rafex.dev', 'duckduckgo.com', 'housedb.rafex.app'];
   const normalized = url.trim();
   if (!normalized) {
     return null;
@@ -1777,7 +2172,7 @@ function resolveAllowedBrowserUrl(url: string) {
   try {
     const parsed = new URL(withProtocol);
     const hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
-    const isAllowed = hostname === 'rafex.dev' || hostname === 'duckduckgo.com';
+    const isAllowed = allowedHosts.includes(hostname);
 
     if (!isAllowed) {
       return null;
@@ -1796,6 +2191,8 @@ function notify(
     kind?: DesktopNotification['kind'];
     sourceId?: string;
     sourceLabel?: string;
+    targetAppId?: string;
+    targetUrl?: string;
   } = {},
 ) {
   const id = nextNotificationId.value;
@@ -1810,6 +2207,8 @@ function notify(
     sourceLabel: options.sourceLabel ?? 'System',
     createdAt: new Date().toISOString(),
     isToastVisible: true,
+    targetAppId: options.targetAppId,
+    targetUrl: options.targetUrl,
   });
 
   notifications.value = notifications.value.slice(0, 30);
@@ -1830,6 +2229,18 @@ function setDesktopRating(value: number) {
   openFeedbackDialog(value);
 }
 
+async function persistPreferences(patch: Partial<DesktopPreferences>) {
+  isSavingPreferences.value = true;
+
+  try {
+    emit('update-preferences', patch);
+  } finally {
+    window.setTimeout(() => {
+      isSavingPreferences.value = false;
+    }, 250);
+  }
+}
+
 function handleThemeToggle() {
   notify(
     'Tema actualizado',
@@ -1844,6 +2255,9 @@ function handleThemeToggle() {
 
 function toggleTheme() {
   isAltTheme.value = !isAltTheme.value;
+  void persistPreferences({
+    theme: isAltTheme.value ? 'sand' : 'ocean',
+  });
   handleThemeToggle();
 }
 
@@ -1853,6 +2267,9 @@ function setThemeMode(value: boolean) {
   }
 
   isAltTheme.value = value;
+  void persistPreferences({
+    theme: value ? 'sand' : 'ocean',
+  });
   handleThemeToggle();
 }
 
@@ -1862,7 +2279,36 @@ function setWallpaper(value: WallpaperVariant) {
   }
 
   wallpaperVariant.value = value;
+  void persistPreferences({
+    wallpaper: value,
+  });
   notify('Wallpaper actualizado', `El fondo cambio a ${value}.`, {
+    kind: 'success',
+    sourceId: 'settings',
+    sourceLabel: 'Settings',
+  });
+}
+
+function saveBrowserHosts() {
+  const hosts = browserHostsDraft.value
+    .split(',')
+    .map((item) => item.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''))
+    .filter(Boolean);
+
+  if (hosts.length === 0) {
+    notify('Dominios invalidos', 'Debes capturar al menos un host permitido para el browser.', {
+      kind: 'warning',
+      sourceId: 'settings',
+      sourceLabel: 'Settings',
+    });
+    return;
+  }
+
+  browserHostsDraft.value = hosts.join(', ');
+  void persistPreferences({
+    browserAllowedHosts: hosts,
+  });
+  notify('Browser actualizado', `Hosts permitidos: ${hosts.join(', ')}.`, {
     kind: 'success',
     sourceId: 'settings',
     sourceLabel: 'Settings',
@@ -1873,22 +2319,37 @@ function saveProfileSettings() {
   const normalizedName = profileDraft.value.name.trim() || props.userName;
   const normalizedEmail = profileDraft.value.email.trim() || props.userEmail;
 
-  profileDraft.value = {
-    name: normalizedName,
-    email: normalizedEmail,
-  };
+  void props
+    .updateProfile(normalizedName, normalizedEmail)
+    .then((user) => {
+      profileDraft.value = {
+        name: user.name,
+        email: user.email,
+      };
 
-  const welcomeWindow = windows.value.find((item) => item.id === 'welcome');
-  if (welcomeWindow) {
-    welcomeWindow.title = `Bienvenido ${normalizedName}`;
-    welcomeWindow.description = `Sesion de ${normalizedEmail} lista. Puedes abrir apps desde el launcher, mover ventanas y usar clic derecho sobre el fondo.`;
-  }
+      const welcomeWindow = windows.value.find((item) => item.id === 'welcome');
+      if (welcomeWindow) {
+        welcomeWindow.title = `Bienvenido ${user.name}`;
+        welcomeWindow.description = `Sesion de ${user.email} lista. Puedes abrir apps desde el launcher, mover ventanas y usar clic derecho sobre el fondo.`;
+      }
 
-  notify('Perfil actualizado', `Se guardaron los datos locales de ${normalizedName}.`, {
-    kind: 'success',
-    sourceId: 'settings',
-    sourceLabel: 'Settings',
-  });
+      notify('Perfil actualizado', `Se guardaron los datos de ${user.name}.`, {
+        kind: 'success',
+        sourceId: 'account',
+        sourceLabel: 'Account',
+      });
+    })
+    .catch((error) => {
+      notify(
+        'No fue posible actualizar el perfil',
+        error instanceof Error ? error.message : 'El backend rechazo la actualizacion del usuario.',
+        {
+          kind: 'error',
+          sourceId: 'account',
+          sourceLabel: 'Account',
+        },
+      );
+    });
 }
 
 function saveWindowDefaults() {
@@ -1900,13 +2361,12 @@ function saveWindowDefaults() {
     height: normalizedHeight,
   };
 
-  window.localStorage.setItem(
-    WINDOW_DEFAULTS_STORAGE_KEY,
-    JSON.stringify({
+  void persistPreferences({
+    defaultWindowSize: {
       width: normalizedWidth,
       height: normalizedHeight,
-    }),
-  );
+    },
+  });
 
   notify('Ventanas actualizadas', `Tamano por defecto: ${normalizedWidth}px x ${normalizedHeight}px.`, {
     kind: 'success',
@@ -1985,6 +2445,36 @@ async function resetAppData() {
       },
     );
   }
+}
+
+function createWorkspaceFile(type: 'notes' | 'terminal') {
+  const suggestedName = type === 'notes' ? 'new-note.md' : 'terminal-session.log';
+  const nextName = window.prompt(`Nombre del nuevo archivo ${type}`, suggestedName)?.trim();
+  if (!nextName) {
+    return;
+  }
+
+  void props
+    .createWorkspaceFile(type, nextName)
+    .then(() => {
+      refreshLocalWorkspace();
+      notify('Archivo creado', `Se preparo un recurso ${type} en el workspace.`, {
+        kind: 'success',
+        sourceId: 'files',
+        sourceLabel: 'Files',
+      });
+    })
+    .catch((error) => {
+      notify(
+        'No fue posible crear el archivo',
+        error instanceof Error ? error.message : 'El backend rechazo la creacion del recurso.',
+        {
+          kind: 'error',
+          sourceId: 'files',
+          sourceLabel: 'Files',
+        },
+      );
+    });
 }
 
 function notifyNotificationCenter() {
@@ -2067,6 +2557,61 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+async function handleHashChange() {
+  const appMatch = window.location.hash.match(/^#\/apps\/([^/?#]+)(?:\?(.*))?$/i);
+  if (appMatch) {
+    const appId = decodeURIComponent(appMatch[1]);
+    const app = props.apps.find((item) => item.id === appId);
+    if (app) {
+      if (app.id === 'browser' && appMatch[2]) {
+        const params = new URLSearchParams(appMatch[2]);
+        const targetUrl = params.get('url');
+        if (targetUrl) {
+          openBrowserUrl(targetUrl);
+          return;
+        }
+      }
+
+      openAppWindow(app.id);
+    }
+    return;
+  }
+
+  const match = window.location.hash.match(/^#\/(notes|ide|terminal)\/([^/?#]+)/i);
+  if (!match) {
+    return;
+  }
+
+  const targetAppId = match[1].toLowerCase() as 'notes' | 'ide' | 'terminal';
+  const fileId = decodeURIComponent(match[2]);
+  const file = backendFiles.value.find((item) => item.id === fileId);
+
+  if (!file) {
+    notify('Deep link no encontrado', 'El archivo solicitado no existe en el workspace actual.', {
+      kind: 'warning',
+      sourceId: 'launcher',
+      sourceLabel: 'Launcher',
+    });
+    return;
+  }
+
+  try {
+    await props.activateWorkspaceFile(fileId);
+    refreshLocalWorkspace();
+    openAppWindow(targetAppId);
+  } catch (error) {
+    notify(
+      'No fue posible resolver el deep link',
+      error instanceof Error ? error.message : 'El kernel no pudo activar el archivo solicitado.',
+      {
+        kind: 'error',
+        sourceId: 'launcher',
+        sourceLabel: 'Launcher',
+      },
+    );
+  }
+}
+
 function formatNotificationTime(value: string) {
   return new Intl.DateTimeFormat('es-MX', {
     hour: '2-digit',
@@ -2111,6 +2656,7 @@ window.addEventListener('mouseup', stopDrag);
 window.addEventListener('mousemove', handleResizeMove);
 window.addEventListener('mouseup', stopResize);
 window.addEventListener('keydown', handleKeydown);
+window.addEventListener('hashchange', hashChangeHandler);
 
 onBeforeUnmount(() => {
   if (clockTimer !== null) {
@@ -2124,6 +2670,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousemove', handleResizeMove);
   window.removeEventListener('mouseup', stopResize);
   window.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('hashchange', hashChangeHandler);
 });
 
 onMounted(() => {
@@ -2149,5 +2696,6 @@ onMounted(() => {
     offlineStateTick.value += 1;
     refreshLocalWorkspace();
   });
+  void handleHashChange();
 });
 </script>

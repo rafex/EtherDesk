@@ -2,6 +2,7 @@
   <div class="terminal-pane">
     <div ref="hostRef" class="terminal-pane__surface"></div>
     <footer class="terminal-pane__status">
+      <span>{{ props.sessionName }}</span>
       <span>{{ statusLabel }}</span>
     </footer>
   </div>
@@ -17,7 +18,11 @@ import { addOfflineSyncCompleteListener, queueOfflineAction, readTerminalSnapsho
 const props = defineProps<{
   userName: string;
   apps: string[];
+  sessionId: string;
+  sessionName: string;
   themeMode: 'ocean' | 'sand';
+  executeCommand: (command: string) => Promise<{ ok: boolean; output: string[] }>;
+  afterCommand?: () => void | Promise<void>;
 }>();
 
 const hostRef = ref<HTMLDivElement | null>(null);
@@ -76,6 +81,8 @@ function writeLine(line: string) {
 
 function persistTerminalSnapshot() {
   const snapshot = saveTerminalSnapshot({
+    fileId: props.sessionId,
+    name: props.sessionName,
     history: commandHistory,
     log: logLines,
   });
@@ -92,7 +99,7 @@ function persistTerminalSnapshot() {
 }
 
 function syncStatusFromSnapshot() {
-  const snapshot = readTerminalSnapshot();
+  const snapshot = readTerminalSnapshot(props.sessionId);
   if (!snapshot) {
     statusLabel.value = navigator.onLine ? 'Terminal lista' : 'Offline: terminal local activa';
     return;
@@ -111,11 +118,12 @@ function writeIntro() {
   }
 
   writeLine('EtherDesk Terminal');
-  writeLine('Comandos permitidos: help, clear, date, whoami, apps, theme');
+  writeLine('Terminal controlada por kernel. No expone bash ni shell real.');
+  writeLine('Comandos permitidos: help, clear, date, whoami, apps, theme, kernel, kiwi --help, kiwi --list-objects, kiwi --new-object --name <nombre>, atlas --help, atlas --status, atlas --list-apps');
   term.write(promptLabel());
 }
 
-function runCommand(rawCommand: string) {
+async function runCommand(rawCommand: string) {
   if (!term) {
     return;
   }
@@ -134,47 +142,44 @@ function runCommand(rawCommand: string) {
       break;
     case 'help':
       writeLine('');
-      writeLine('help   lista comandos');
-      writeLine('clear  limpia la terminal');
-      writeLine('date   fecha local');
-      writeLine('whoami usuario actual');
-      writeLine('apps   aplicaciones disponibles');
-      writeLine('theme  tema visual actual');
+      writeLine('help    lista comandos');
+      writeLine('clear   limpia la terminal');
+      writeLine('date    fecha local');
+      writeLine('whoami  usuario actual');
+      writeLine('apps    aplicaciones disponibles');
+      writeLine('theme   tema visual actual');
+      writeLine('kernel  version del kernel');
+      writeLine('kiwi --help');
+      writeLine('kiwi --list-objects');
+      writeLine('kiwi --new-object --name <nombre>');
+      writeLine('atlas --help');
+      writeLine('atlas --status');
+      writeLine('atlas --list-apps');
       printPrompt();
       break;
     case 'clear':
       term.clear();
       logLines = [];
       term.write(promptLabel());
-      break;
-    case 'date':
-      writeLine('');
-      writeLine(new Date().toLocaleString('es-MX'));
-      printPrompt();
-      break;
-    case 'whoami':
-      writeLine('');
-      writeLine(props.userName);
-      printPrompt();
-      break;
-    case 'apps':
-      writeLine('');
-      writeLine(props.apps.join(', '));
-      printPrompt();
-      break;
-    case 'theme':
-      writeLine('');
-      writeLine(props.themeMode);
-      printPrompt();
+      persistTerminalSnapshot();
       break;
     default:
+      statusLabel.value = navigator.onLine ? 'Ejecutando en kernel...' : 'Offline: la terminal requiere conexion para ejecutar comandos';
       writeLine('');
-      writeLine(`Comando no permitido: ${rawCommand}`);
-      printPrompt();
+
+      try {
+        const result = await props.executeCommand(rawCommand);
+        result.output.forEach((line) => writeLine(line));
+        printPrompt();
+        persistTerminalSnapshot();
+        await props.afterCommand?.();
+      } catch (error) {
+        writeLine(error instanceof Error ? error.message : `No fue posible ejecutar: ${rawCommand}`);
+        printPrompt();
+        statusLabel.value = 'Kernel no disponible';
+      }
       break;
   }
-
-  persistTerminalSnapshot();
 }
 
 function bindInput() {
@@ -188,7 +193,7 @@ function bindInput() {
     }
 
     if (data === '\r') {
-      runCommand(commandBuffer);
+      void runCommand(commandBuffer);
       commandBuffer = '';
       return;
     }
@@ -227,7 +232,7 @@ onMounted(() => {
   fitAddon.fit();
   bindInput();
 
-  const storedSnapshot = readTerminalSnapshot();
+  const storedSnapshot = readTerminalSnapshot(props.sessionId);
   if (storedSnapshot && storedSnapshot.log.length > 0) {
     logLines = [...storedSnapshot.log];
     commandHistory = [...storedSnapshot.history];
@@ -259,6 +264,29 @@ watch(
   },
 );
 
+watch(
+  () => [props.sessionId, props.sessionName] as const,
+  () => {
+    const storedSnapshot = readTerminalSnapshot(props.sessionId);
+    if (!term) {
+      return;
+    }
+
+    term.clear();
+    logLines = storedSnapshot?.log ? [...storedSnapshot.log] : [];
+    commandHistory = storedSnapshot?.history ? [...storedSnapshot.history] : [];
+
+    if (storedSnapshot && storedSnapshot.log.length > 0) {
+      storedSnapshot.log.forEach((line) => term?.writeln(line));
+      term.write(promptLabel());
+      syncStatusFromSnapshot();
+    } else {
+      writeIntro();
+      statusLabel.value = navigator.onLine ? 'Terminal lista' : 'Offline: terminal local activa';
+    }
+  },
+);
+
 onBeforeUnmount(() => {
   removeSyncCompleteListener?.();
   resizeObserver?.disconnect();
@@ -283,6 +311,8 @@ onBeforeUnmount(() => {
 .terminal-pane__status {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   min-height: 32px;
   padding: 0 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);

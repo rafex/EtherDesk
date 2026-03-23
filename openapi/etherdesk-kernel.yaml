@@ -1,0 +1,614 @@
+openapi: 3.1.0
+info:
+  title: EtherDesk Kernel Contract
+  version: 0.1.0
+  summary: Contrato base del kernel para el sistema operativo web EtherDesk.
+servers:
+  - url: http://localhost:3010
+tags:
+  - name: Auth
+  - name: Desktop
+  - name: Workspace
+  - name: Terminal
+  - name: Monitor
+paths:
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Inicia sesion en EtherDesk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Sesion creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEnvelopeResponse'
+  /api/auth/session:
+    get:
+      tags: [Auth]
+      summary: Restaura una sesion existente
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sesion valida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEnvelopeResponse'
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Renueva la sesion vigente
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sesion renovada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEnvelopeResponse'
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Invalida la sesion actual
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sesion invalidada
+  /api/os/desktop:
+    get:
+      tags: [Desktop]
+      summary: Bootstrap completo del desktop
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Estado del desktop
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DesktopStateResponse'
+  /api/os/preferences:
+    post:
+      tags: [Desktop]
+      summary: Actualiza preferencias persistentes del usuario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DesktopPreferencesPatch'
+      responses:
+        '200':
+          description: Preferencias actualizadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DesktopPreferencesResponse'
+  /api/os/feedback:
+    post:
+      tags: [Desktop]
+      summary: Registra satisfaccion y feedback del usuario
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackSubmission'
+      responses:
+        '200':
+          description: Feedback guardado
+  /api/os/notes/sync:
+    post:
+      tags: [Workspace]
+      summary: Sincroniza el draft del editor
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotesDraftSnapshot'
+      responses:
+        '200':
+          description: Draft sincronizado
+  /api/os/terminal/sync:
+    post:
+      tags: [Workspace]
+      summary: Sincroniza el snapshot de terminal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TerminalSessionSnapshot'
+      responses:
+        '200':
+          description: Snapshot sincronizado
+  /api/os/files/rename:
+    post:
+      tags: [Workspace]
+      summary: Renombra un archivo virtual del workspace
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileId, name]
+              properties:
+                fileId:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Archivo renombrado
+  /api/os/files/create:
+    post:
+      tags: [Workspace]
+      summary: Crea un archivo virtual minimo del workspace
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [notes, terminal]
+                name:
+                  type: string
+      responses:
+        '200':
+          description: Archivo creado
+  /api/os/files/activate:
+    post:
+      tags: [Workspace]
+      summary: Marca un archivo virtual como activo para su app
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileId]
+              properties:
+                fileId:
+                  type: string
+      responses:
+        '200':
+          description: Archivo activado
+  /api/os/files/duplicate:
+    post:
+      tags: [Workspace]
+      summary: Duplica un archivo virtual del workspace
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileId]
+              properties:
+                fileId:
+                  type: string
+      responses:
+        '200':
+          description: Archivo duplicado
+  /api/os/files/delete:
+    post:
+      tags: [Workspace]
+      summary: Elimina un archivo virtual del workspace
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileId]
+              properties:
+                fileId:
+                  type: string
+      responses:
+        '200':
+          description: Archivo eliminado
+  /api/os/account/profile:
+    post:
+      tags: [Desktop]
+      summary: Actualiza el perfil basico del usuario autenticado
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+      responses:
+        '200':
+          description: Perfil actualizado
+  /api/os/terminal/execute:
+    post:
+      tags: [Terminal]
+      summary: Ejecuta un comando permitido de terminal controlada
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command:
+                  type: string
+      responses:
+        '200':
+          description: Comando ejecutado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalExecutionResponse'
+        '403':
+          description: Comando bloqueado
+  /api/os/monitor:
+    get:
+      tags: [Monitor]
+      summary: Estado del kernel, eventos y metricas simples
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Snapshot de observabilidad
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonitorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    SessionUser:
+      type: object
+      required: [id, name, email, role]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string }
+    SessionEnvelope:
+      type: object
+      required: [token, user, expiresAt]
+      properties:
+        token: { type: string }
+        user:
+          $ref: '#/components/schemas/SessionUser'
+        expiresAt:
+          type: string
+          format: date-time
+    SessionEnvelopeResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/SessionEnvelope'
+    FeedbackSubmission:
+      type: object
+      required: [rating, chips, comment]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        chips:
+          type: array
+          items:
+            type: string
+        comment:
+          type: string
+    AppShortcut:
+      type: object
+      required: [id, name, description, icon, route, type, origin, permissions]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        icon: { type: string }
+        route: { type: string }
+        url: { type: string }
+        allowedHosts:
+          type: array
+          items: { type: string }
+        type:
+          type: string
+          enum: [core, workspace, system, integration]
+        origin:
+          type: string
+          enum: [internal, external]
+        permissions:
+          type: array
+          items:
+            type: string
+    KernelDescriptor:
+      type: object
+      required: [name, version, operations, permissions, sessionTtlSeconds]
+      properties:
+        name: { type: string }
+        version: { type: string }
+        operations:
+          type: array
+          items: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+        sessionTtlSeconds:
+          type: integer
+    DesktopPreferences:
+      type: object
+      required: [theme, wallpaper, browserAllowedHosts, defaultWindowSize, satisfaction, lastFeedback]
+      properties:
+        theme:
+          type: string
+          enum: [ocean, sand]
+        wallpaper:
+          type: string
+          enum: [ocean, sunset, graphite]
+        browserAllowedHosts:
+          type: array
+          items:
+            type: string
+        defaultWindowSize:
+          type: object
+          required: [width, height]
+          properties:
+            width: { type: integer }
+            height: { type: integer }
+        satisfaction:
+          type: integer
+        lastFeedback:
+          anyOf:
+            - $ref: '#/components/schemas/FeedbackSubmission'
+            - type: 'null'
+    DesktopPreferencesPatch:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [ocean, sand]
+        wallpaper:
+          type: string
+          enum: [ocean, sunset, graphite]
+        browserAllowedHosts:
+          type: array
+          items:
+            type: string
+        defaultWindowSize:
+          type: object
+          properties:
+            width: { type: integer }
+            height: { type: integer }
+    NotesDraftSnapshot:
+      type: object
+      required: [content, updatedAt]
+      properties:
+        content: { type: string }
+        updatedAt:
+          type: string
+          format: date-time
+        syncedAt:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+    TerminalSessionSnapshot:
+      type: object
+      required: [history, log, updatedAt]
+      properties:
+        history:
+          type: array
+          items: { type: string }
+        log:
+          type: array
+          items: { type: string }
+        updatedAt:
+          type: string
+          format: date-time
+        syncedAt:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+    WorkspaceState:
+      type: object
+      required: [activeNotesFileId, activeTerminalFileId, notes, terminal, notesFiles, terminalFiles, files]
+      properties:
+        activeNotesFileId:
+          anyOf:
+            - type: string
+            - type: 'null'
+        activeTerminalFileId:
+          anyOf:
+            - type: string
+            - type: 'null'
+        notes:
+          anyOf:
+            - allOf:
+                - $ref: '#/components/schemas/NotesDraftSnapshot'
+                - type: object
+                  required: [id, name]
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+            - type: 'null'
+        terminal:
+          anyOf:
+            - allOf:
+                - $ref: '#/components/schemas/TerminalSessionSnapshot'
+                - type: object
+                  required: [id, name]
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+            - type: 'null'
+        notesFiles:
+          type: array
+          items:
+            type: object
+            required: [id, name, content, updatedAt]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              content: { type: string }
+              updatedAt:
+                type: string
+                format: date-time
+        terminalFiles:
+          type: array
+          items:
+            type: object
+            required: [id, name, history, log, updatedAt]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              history:
+                type: array
+                items: { type: string }
+              log:
+                type: array
+                items: { type: string }
+              updatedAt:
+                type: string
+                format: date-time
+        files:
+          type: array
+          items:
+            type: object
+            required: [id, name, type, updatedAt]
+            properties:
+              id: { type: string }
+              name: { type: string }
+              type:
+                type: string
+                enum: [notes, terminal]
+              updatedAt:
+                type: string
+                format: date-time
+    DesktopState:
+      type: object
+      required: [apps, user, kernel, preferences, workspace]
+      properties:
+        apps:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppShortcut'
+        user:
+          $ref: '#/components/schemas/SessionUser'
+        kernel:
+          $ref: '#/components/schemas/KernelDescriptor'
+        preferences:
+          $ref: '#/components/schemas/DesktopPreferences'
+        workspace:
+          $ref: '#/components/schemas/WorkspaceState'
+    DesktopStateResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/DesktopState'
+    DesktopPreferencesResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/DesktopPreferences'
+    TerminalExecutionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [ok, output]
+          properties:
+            ok:
+              type: boolean
+            output:
+              type: array
+              items:
+                type: string
+    MonitorResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          properties:
+            kernel:
+              $ref: '#/components/schemas/KernelDescriptor'
+            preferences:
+              $ref: '#/components/schemas/DesktopPreferences'
+            workspace:
+              $ref: '#/components/schemas/WorkspaceState'
+            metrics:
+              type: object
+              properties:
+                registeredApps: { type: integer }
+                files: { type: integer }
+                events: { type: integer }
+            events:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  type: { type: string }
+                  message: { type: string }
+                  createdAt:
+                    type: string
+                    format: date-time
+                  level:
+                    type: string
+                    enum: [info, warning, error]

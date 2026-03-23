@@ -4,6 +4,16 @@ import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
   plugins: [vue()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          codemirror: ['@codemirror/state', '@codemirror/view'],
+          xterm: ['@xterm/xterm', '@xterm/addon-fit'],
+        },
+      },
+    },
+  },
   css: {
     preprocessorOptions: {
       scss: {

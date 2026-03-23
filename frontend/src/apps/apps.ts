@@ -10,8 +10,14 @@ export const desktopApps: AppShortcut[] = [
   {
     id: 'notes',
     name: 'Notes',
-    description: 'Editor de texto simple para la PoC.',
+    description: 'Editor ligero de texto con CodeMirror.',
     icon: 'notes',
+  },
+  {
+    id: 'ide',
+    name: 'IDE',
+    description: 'Editor avanzado con Monaco para documentos activos.',
+    icon: 'ide',
   },
   {
     id: 'terminal',

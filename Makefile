@@ -1,7 +1,10 @@
-.PHONY: frontend-install frontend-dev frontend-start frontend-build frontend-preview backend-mock-install backend-mock-dev backend-mock-start backend-mock-build
+.PHONY: dev frontend-install frontend-dev frontend-start frontend-build frontend-preview backend-mock-install backend-mock-dev backend-mock-start backend-mock-build
 
 FRONTEND_DIR := frontend
 BACKEND_JS_DIR := backend/javascript
+
+dev:
+	@bash -lc 'trap "kill 0" INT TERM EXIT; $(MAKE) backend-mock-dev & $(MAKE) frontend-dev & wait'
 
 frontend-install:
 	$(MAKE) -C $(FRONTEND_DIR) install

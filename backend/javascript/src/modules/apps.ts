@@ -1,10 +1,13 @@
-export interface MockApp {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  route: string;
-  url?: string;
+import type { AppShortcutContract } from '../shared/contracts.js';
+
+export type MockApp = AppShortcutContract;
+
+function browserAllowedHosts() {
+  const configured = process.env.ETHERDESK_BROWSER_ALLOWED_HOSTS?.split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+  return configured && configured.length > 0 ? configured : ['rafex.dev', 'duckduckgo.com', 'housedb.rafex.app'];
 }
 
 export const mockApps: MockApp[] = [
@@ -14,13 +17,30 @@ export const mockApps: MockApp[] = [
     description: 'Navegador web conceptual dentro de EtherDesk.',
     icon: 'browser',
     route: '/apps/browser',
+    allowedHosts: browserAllowedHosts(),
+    type: 'integration',
+    origin: 'internal',
+    permissions: ['browser.navigate'],
   },
   {
     id: 'notes',
     name: 'Notes',
-    description: 'Editor de texto simple.',
+    description: 'Editor ligero de texto con CodeMirror.',
     icon: 'notes',
     route: '/apps/notes',
+    type: 'workspace',
+    origin: 'internal',
+    permissions: ['notes.read', 'notes.write', 'files.read'],
+  },
+  {
+    id: 'ide',
+    name: 'IDE',
+    description: 'Editor avanzado con Monaco para el documento activo.',
+    icon: 'ide',
+    route: '/apps/ide',
+    type: 'workspace',
+    origin: 'internal',
+    permissions: ['notes.read', 'notes.write', 'files.read'],
   },
   {
     id: 'terminal',
@@ -28,6 +48,9 @@ export const mockApps: MockApp[] = [
     description: 'Terminal controlada.',
     icon: 'terminal',
     route: '/apps/terminal',
+    type: 'workspace',
+    origin: 'internal',
+    permissions: ['terminal.execute.controlled', 'files.read'],
   },
   {
     id: 'files',
@@ -35,6 +58,9 @@ export const mockApps: MockApp[] = [
     description: 'Explorador minimo de archivos locales del workspace.',
     icon: 'files',
     route: '/apps/files',
+    type: 'workspace',
+    origin: 'internal',
+    permissions: ['files.read', 'files.write', 'notes.read', 'terminal.execute.controlled'],
   },
   {
     id: 'system-monitor',
@@ -42,6 +68,9 @@ export const mockApps: MockApp[] = [
     description: 'Estado del sistema web, kernel y PWA.',
     icon: 'monitor',
     route: '/apps/system-monitor',
+    type: 'system',
+    origin: 'internal',
+    permissions: ['monitor.read'],
   },
   {
     id: 'notification-center',
@@ -49,6 +78,9 @@ export const mockApps: MockApp[] = [
     description: 'Centro completo de notificaciones y eventos.',
     icon: 'notifications',
     route: '/apps/notifications',
+    type: 'system',
+    origin: 'internal',
+    permissions: ['notifications.read'],
   },
   {
     id: 'settings',
@@ -56,6 +88,9 @@ export const mockApps: MockApp[] = [
     description: 'Configuracion visual del sistema.',
     icon: 'settings',
     route: '/apps/settings',
+    type: 'system',
+    origin: 'internal',
+    permissions: ['settings.write'],
   },
   {
     id: 'account',
@@ -63,6 +98,9 @@ export const mockApps: MockApp[] = [
     description: 'Perfil, sesion y estado del usuario.',
     icon: 'account',
     route: '/apps/account',
+    type: 'system',
+    origin: 'internal',
+    permissions: ['account.read'],
   },
   {
     id: 'tasks',
@@ -70,6 +108,9 @@ export const mockApps: MockApp[] = [
     description: 'Trabajos pendientes y sincronizaciones offline.',
     icon: 'tasks',
     route: '/apps/tasks',
+    type: 'system',
+    origin: 'internal',
+    permissions: ['tasks.read'],
   },
   {
     id: 'help',
@@ -77,6 +118,9 @@ export const mockApps: MockApp[] = [
     description: 'Guia rapida del sistema y sus limitaciones.',
     icon: 'help',
     route: '/apps/help',
+    type: 'system',
+    origin: 'internal',
+    permissions: ['help.read'],
   },
   {
     id: 'tars-chat',
@@ -84,5 +128,8 @@ export const mockApps: MockApp[] = [
     description: 'Asistente local del sistema para ayuda rapida.',
     icon: 'chat',
     route: '/apps/tars-chat',
+    type: 'core',
+    origin: 'internal',
+    permissions: ['help.read', 'notifications.read'],
   },
 ];

@@ -1066,6 +1066,31 @@ button {
   gap: 10px;
 }
 
+.desktop-launcher__group {
+  display: grid;
+  gap: 10px;
+}
+
+.desktop-launcher__group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.desktop-launcher__group-head strong {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #eef4ff;
+}
+
+.desktop-launcher__group-head span {
+  font-size: 0.74rem;
+  color: rgba(170, 175, 196, 0.86);
+}
+
 .desktop-launcher__result {
   display: flex;
   align-items: center;
@@ -1081,6 +1106,11 @@ button {
 
 .desktop-launcher__result:hover {
   background: rgba(18, 26, 40, 0.92);
+}
+
+.desktop-launcher__result--web {
+  border-color: rgba(143, 184, 255, 0.18);
+  background: rgba(12, 18, 30, 0.86);
 }
 
 .desktop-launcher__result-icon {
@@ -1099,6 +1129,13 @@ button {
   height: 22px;
 }
 
+.desktop-launcher__result-image {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: block;
+}
+
 .desktop-launcher__result-copy {
   display: grid;
   text-align: left;
@@ -1112,6 +1149,11 @@ button {
 .desktop-launcher__result-copy span {
   font-size: 0.78rem;
   color: #aaafc4;
+}
+
+.desktop-launcher__result-copy small {
+  font-size: 0.72rem;
+  color: rgba(143, 184, 255, 0.82);
 }
 
 .desktop-launcher__empty {
@@ -1414,10 +1456,21 @@ button {
 .desktop-notification-center__item {
   display: grid;
   gap: 8px;
+  width: 100%;
   padding: 12px;
+  text-align: left;
+  cursor: pointer;
   border-radius: 12px;
+  appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.06);
+  outline: none;
+  font: inherit;
+  color: inherit;
   background: rgba(255, 255, 255, 0.03);
+}
+
+.desktop-notification-center__item:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .desktop-notification-center__item--error {

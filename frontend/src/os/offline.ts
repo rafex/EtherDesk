@@ -1,7 +1,7 @@
 import type { FeedbackSubmission, NotesDraftSnapshot, TerminalSessionSnapshot } from '@/shared/types';
 
-const NOTES_DRAFT_KEY = 'etherdesk.notes.draft';
-const TERMINAL_SNAPSHOT_KEY = 'etherdesk.terminal.snapshot';
+const NOTES_DRAFTS_KEY = 'etherdesk.notes.drafts';
+const TERMINAL_SNAPSHOTS_KEY = 'etherdesk.terminal.snapshots';
 const OFFLINE_QUEUE_KEY = 'etherdesk.offline.queue';
 const SYNC_EVENT_NAME = 'etherdesk:sync-request';
 const SYNC_COMPLETE_EVENT_NAME = 'etherdesk:sync-complete';
@@ -68,62 +68,117 @@ function removeItem(key: string) {
   window.localStorage.removeItem(key);
 }
 
-export function readNotesDraft() {
-  return readJson<NotesDraftSnapshot | null>(NOTES_DRAFT_KEY, null);
+function readNotesDraftsMap() {
+  return readJson<Record<string, NotesDraftSnapshot>>(NOTES_DRAFTS_KEY, {});
 }
 
-export function saveNotesDraft(content: string, syncedAt: string | null = null) {
+function writeNotesDraftsMap(value: Record<string, NotesDraftSnapshot>) {
+  writeJson(NOTES_DRAFTS_KEY, value);
+}
+
+function readTerminalSnapshotsMap() {
+  return readJson<Record<string, TerminalSessionSnapshot>>(TERMINAL_SNAPSHOTS_KEY, {});
+}
+
+function writeTerminalSnapshotsMap(value: Record<string, TerminalSessionSnapshot>) {
+  writeJson(TERMINAL_SNAPSHOTS_KEY, value);
+}
+
+export function listNotesDrafts() {
+  return Object.values(readNotesDraftsMap());
+}
+
+export function readNotesDraft(fileId: string) {
+  return readNotesDraftsMap()[fileId] ?? null;
+}
+
+export function saveNotesDraft(
+  fileId: string,
+  name: string,
+  content: string,
+  syncedAt: string | null = null,
+  updatedAt = new Date().toISOString(),
+) {
   const snapshot: NotesDraftSnapshot = {
+    fileId,
+    name,
     content,
-    updatedAt: new Date().toISOString(),
+    updatedAt,
     syncedAt,
   };
 
-  writeJson(NOTES_DRAFT_KEY, snapshot);
+  const drafts = readNotesDraftsMap();
+  drafts[fileId] = snapshot;
+  writeNotesDraftsMap(drafts);
   announceOfflineStateChange();
   return snapshot;
 }
 
-export function markNotesDraftSynced() {
-  const currentDraft = readNotesDraft();
+export function removeNotesDraft(fileId: string) {
+  const drafts = readNotesDraftsMap();
+  delete drafts[fileId];
+  writeNotesDraftsMap(drafts);
+  announceOfflineStateChange();
+}
+
+export function markNotesDraftSynced(fileId: string) {
+  const currentDraft = readNotesDraft(fileId);
   if (!currentDraft) {
     return;
   }
 
-  writeJson(NOTES_DRAFT_KEY, {
-    ...currentDraft,
-    syncedAt: new Date().toISOString(),
-  });
+  saveNotesDraft(currentDraft.fileId, currentDraft.name, currentDraft.content, new Date().toISOString(), currentDraft.updatedAt);
   announceOfflineStateChange();
 }
 
-export function readTerminalSnapshot() {
-  return readJson<TerminalSessionSnapshot | null>(TERMINAL_SNAPSHOT_KEY, null);
+export function listTerminalSnapshots() {
+  return Object.values(readTerminalSnapshotsMap());
 }
 
-export function saveTerminalSnapshot(snapshot: Pick<TerminalSessionSnapshot, 'history' | 'log'>, syncedAt: string | null = null) {
+export function readTerminalSnapshot(fileId: string) {
+  return readTerminalSnapshotsMap()[fileId] ?? null;
+}
+
+export function saveTerminalSnapshot(
+  snapshot: Pick<TerminalSessionSnapshot, 'fileId' | 'name' | 'history' | 'log'>,
+  syncedAt: string | null = null,
+  updatedAt = new Date().toISOString(),
+) {
   const payload: TerminalSessionSnapshot = {
+    fileId: snapshot.fileId,
+    name: snapshot.name,
     history: snapshot.history,
     log: snapshot.log,
-    updatedAt: new Date().toISOString(),
+    updatedAt,
     syncedAt,
   };
 
-  writeJson(TERMINAL_SNAPSHOT_KEY, payload);
+  const snapshots = readTerminalSnapshotsMap();
+  snapshots[snapshot.fileId] = payload;
+  writeTerminalSnapshotsMap(snapshots);
   announceOfflineStateChange();
   return payload;
 }
 
-export function markTerminalSnapshotSynced() {
-  const currentSnapshot = readTerminalSnapshot();
+export function removeTerminalSnapshot(fileId: string) {
+  const snapshots = readTerminalSnapshotsMap();
+  delete snapshots[fileId];
+  writeTerminalSnapshotsMap(snapshots);
+  announceOfflineStateChange();
+}
+
+export function clearLegacyOfflineKeys() {
+  removeItem('etherdesk.notes.draft');
+  removeItem('etherdesk.terminal.snapshot');
+}
+
+export function markTerminalSnapshotSynced(fileId: string) {
+  const currentSnapshot = readTerminalSnapshot(fileId);
   if (!currentSnapshot) {
     return;
   }
 
-  writeJson(TERMINAL_SNAPSHOT_KEY, {
-    ...currentSnapshot,
-    syncedAt: new Date().toISOString(),
-  });
+  saveTerminalSnapshot(currentSnapshot, new Date().toISOString(), currentSnapshot.updatedAt);
   announceOfflineStateChange();
 }
 
@@ -140,8 +195,16 @@ function writeOfflineQueue(queue: OfflineAction[]) {
   writeJson(OFFLINE_QUEUE_KEY, queue);
 }
 
+function offlineActionIdentity(action: Omit<OfflineAction, 'id' | 'createdAt'> | OfflineAction) {
+  if (action.type === 'notes.sync' || action.type === 'terminal.sync') {
+    return `${action.type}:${action.payload.fileId}`;
+  }
+
+  return action.type;
+}
+
 export function queueOfflineAction(action: Omit<OfflineAction, 'id' | 'createdAt'>) {
-  const currentQueue = readOfflineQueue().filter((item) => item.type !== action.type);
+  const currentQueue = readOfflineQueue().filter((item) => offlineActionIdentity(item) !== offlineActionIdentity(action));
   const nextItem: OfflineAction = {
     ...action,
     id: `${action.type}-${Date.now()}`,
@@ -222,10 +285,10 @@ export async function flushOfflineQueue(handlers: {
     try {
       if (action.type === 'notes.sync') {
         await handlers.syncNotes(action.payload);
-        markNotesDraftSynced();
+        markNotesDraftSynced(action.payload.fileId);
       } else if (action.type === 'terminal.sync') {
         await handlers.syncTerminal(action.payload);
-        markTerminalSnapshotSynced();
+        markTerminalSnapshotSynced(action.payload.fileId);
       } else if (action.type === 'feedback.sync') {
         await handlers.syncFeedback(action.payload);
       }

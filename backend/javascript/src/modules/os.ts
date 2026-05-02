@@ -2,6 +2,7 @@ import { sessionTtlSeconds } from './auth.js';
 import { auditKernelEvent, listKernelEvents } from './audit.js';
 import { type KiwiObjectRecord } from './kiwi.js';
 import { executeToolkitCommand, listToolkitUsages } from './toolkits/dispatch.js';
+import { toolkitRegistry } from './toolkits/config.js';
 import type { MockApp } from './apps.js';
 import type {
   AppPermission,
@@ -20,6 +21,7 @@ interface PreferencesPatch {
   theme?: 'ocean' | 'sand';
   wallpaper?: 'ocean' | 'sunset' | 'graphite';
   browserAllowedHosts?: string[];
+  favoriteAppIds?: string[];
   defaultWindowSize?: {
     width: number;
     height: number;
@@ -74,6 +76,7 @@ function buildDefaultState(): UserKernelState {
       theme: 'ocean',
       wallpaper: 'ocean',
       browserAllowedHosts: defaultBrowserAllowedHosts(),
+      favoriteAppIds: ['browser', 'notes', 'terminal', 'settings'],
       defaultWindowSize: {
         width: 440,
         height: 320,
@@ -184,6 +187,10 @@ export function updatePreferences(userId: string, patch: PreferencesPatch) {
 
   if (patch.browserAllowedHosts) {
     state.preferences.browserAllowedHosts = patch.browserAllowedHosts;
+  }
+
+  if (patch.favoriteAppIds) {
+    state.preferences.favoriteAppIds = patch.favoriteAppIds;
   }
 
   if (patch.defaultWindowSize) {
@@ -468,6 +475,17 @@ export function buildMonitorPayload(userId: string, apps: MockApp[]) {
     kernel: buildDesktopPayload(apps, userId).kernel,
     preferences: state.preferences,
     workspace: state.workspace,
+    toolkits: toolkitRegistry.map((toolkit) => ({
+      name: toolkit.name,
+      description: toolkit.description,
+      allowedRoles: toolkit.allowedRoles,
+      tools: toolkit.tools.map((tool) => ({
+        flag: tool.flag,
+        usage: tool.usage,
+        description: tool.description,
+        allowedRoles: tool.allowedRoles ?? toolkit.allowedRoles,
+      })),
+    })),
     metrics: {
       registeredApps: apps.length,
       files: state.workspace.files.length,

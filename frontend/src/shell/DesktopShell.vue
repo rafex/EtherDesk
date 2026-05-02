@@ -430,6 +430,27 @@
               </div>
 
               <div class="desktop-settings__group">
+                <span class="desktop-settings__label">Favoritos del launcher</span>
+                <div class="desktop-settings__choices">
+                  <button
+                    v-for="app in props.apps"
+                    :key="`favorite-${app.id}`"
+                    class="desktop-settings__choice"
+                    :class="{ 'desktop-settings__choice--active': favoriteAppIdsDraft.includes(app.id) }"
+                    type="button"
+                    @click="toggleFavoriteApp(app.id)"
+                  >
+                    {{ app.name }}
+                  </button>
+                </div>
+                <div class="desktop-settings__actions">
+                  <button class="desktop-settings__save" type="button" :disabled="isSavingPreferences" @click="saveFavoriteApps">
+                    {{ isSavingPreferences ? 'Guardando...' : 'Guardar favoritos' }}
+                  </button>
+                </div>
+              </div>
+
+              <div class="desktop-settings__group">
                 <span class="desktop-settings__label">Tamano por defecto de ventanas</span>
                 <label class="desktop-settings__field">
                   <span>Ancho (px)</span>
@@ -598,6 +619,10 @@
                 <strong>{{ profileDraft.email }}</strong>
               </article>
               <article class="desktop-monitor__card">
+                <span>Rol activo</span>
+                <strong>{{ userRoleLabel }}</strong>
+              </article>
+              <article class="desktop-monitor__card">
                 <span>Service Worker</span>
                 <strong>{{ serviceWorkerStatus }}</strong>
               </article>
@@ -618,6 +643,24 @@
                 <strong>{{ props.monitorState?.metrics.registeredApps ?? props.apps.length }}</strong>
               </article>
             </div>
+            <div class="desktop-monitor__toolkits">
+              <div class="desktop-monitor__section-head">
+                <p class="desktop-window__eyebrow">Toolkits</p>
+                <h3>Comandos controlados del kernel</h3>
+              </div>
+              <article v-for="toolkit in toolkitPolicies" :key="toolkit.name" class="desktop-monitor__toolkit">
+                <div class="desktop-monitor__toolkit-head">
+                  <strong>{{ toolkit.name }}</strong>
+                  <span>{{ toolkit.allowedRoles.join(', ') }}</span>
+                </div>
+                <p>{{ toolkit.description }}</p>
+                <ul>
+                  <li v-for="tool in toolkit.tools" :key="`${toolkit.name}-${tool.flag}`">
+                    <code>{{ tool.usage }}</code>
+                  </li>
+                </ul>
+              </article>
+            </div>
             <div class="desktop-settings__actions desktop-settings__actions--monitor">
               <button class="desktop-settings__save" type="button" @click="refreshMonitor">Actualizar monitor</button>
             </div>
@@ -630,6 +673,7 @@
               <div>
                 <h2>{{ profileDraft.name }}</h2>
                 <p>{{ profileDraft.email }}</p>
+                <p>Rol: {{ userRoleLabel }}</p>
                 <p>EtherDesk OS {{ props.osVersion }}</p>
                 <p>Sesion expira: {{ sessionExpirationLabel }}</p>
               </div>
@@ -665,6 +709,18 @@
               <li>Las tareas pendientes se ven en `Tasks`</li>
               <li>Usa `Settings` para resetear datos de la PWA</li>
             </ul>
+            <div class="desktop-help__toolkits">
+              <h3>Toolkits disponibles</h3>
+              <article v-for="toolkit in toolkitPolicies" :key="`help-${toolkit.name}`" class="desktop-help__toolkit">
+                <strong>{{ toolkit.name }}</strong>
+                <p>{{ toolkit.description }}</p>
+                <ul class="desktop-help__list">
+                  <li v-for="tool in toolkit.tools" :key="`help-tool-${toolkit.name}-${tool.flag}`">
+                    <code>{{ tool.usage }}</code> · roles: {{ tool.allowedRoles.join(', ') }}
+                  </li>
+                </ul>
+              </article>
+            </div>
           </div>
 
           <div v-else class="desktop-window__editor-card">
@@ -936,6 +992,7 @@ const props = defineProps<{
   apps: AppShortcut[];
   userName: string;
   userEmail: string;
+  userRole: string;
   initialRating: number;
   osVersion: string;
   preferences: DesktopPreferences | null;
@@ -996,6 +1053,7 @@ const profileDraft = ref({
 });
 const windowDefaultsDraft = ref(readStoredWindowDefaults());
 const browserHostsDraft = ref('');
+const favoriteAppIdsDraft = ref<string[]>([]);
 const wallpaperOptions: Array<{ id: WallpaperVariant; label: string }> = [
   { id: 'ocean', label: 'Oceano' },
   { id: 'sunset', label: 'Sunset' },
@@ -1160,13 +1218,23 @@ const launcherEntries = computed<LauncherEntry[]>(() => {
 const launcherGroups = computed(() => {
   const appEntries = launcherEntries.value.filter((entry) => entry.group === 'apps');
   const webEntries = launcherEntries.value.filter((entry) => entry.group === 'web');
+  const favoriteEntries = appEntries.filter((entry) => favoriteAppIdsDraft.value.includes(entry.appId));
+  const regularAppEntries = appEntries.filter((entry) => !favoriteAppIdsDraft.value.includes(entry.appId));
   const groups: Array<{ id: string; label: string; entries: LauncherEntry[] }> = [];
 
-  if (appEntries.length > 0) {
+  if (favoriteEntries.length > 0) {
+    groups.push({
+      id: 'favorites',
+      label: 'Favoritos',
+      entries: favoriteEntries,
+    });
+  }
+
+  if (regularAppEntries.length > 0) {
     groups.push({
       id: 'apps',
       label: 'Apps',
-      entries: appEntries,
+      entries: regularAppEntries,
     });
   }
 
@@ -1212,6 +1280,7 @@ const serviceWorkerStatus = ref('checking');
 const displayModeLabel = ref('browser');
 const backendFiles = computed(() => props.monitorState?.workspace.files ?? []);
 const monitorEvents = computed(() => props.monitorState?.events ?? []);
+const toolkitPolicies = computed(() => props.monitorState?.toolkits ?? []);
 const sessionExpirationLabel = computed(() => {
   if (!props.sessionExpiresAt) {
     return 'Sin expiracion disponible';
@@ -1224,6 +1293,7 @@ const sessionExpirationLabel = computed(() => {
     minute: '2-digit',
   }).format(new Date(props.sessionExpiresAt));
 });
+const userRoleLabel = computed(() => props.userRole || 'guest');
 const activeNotesFileName = computed(() => props.monitorState?.workspace.notes?.name ?? 'notes.md');
 const activeNotesFileId = computed(() => props.monitorState?.workspace.notes?.id ?? 'notes-file');
 const activeTerminalFileName = computed(() => props.monitorState?.workspace.terminal?.name ?? 'terminal-session.log');
@@ -1266,6 +1336,7 @@ watch(
       height: preferences.defaultWindowSize.height,
     };
     browserHostsDraft.value = preferences.browserAllowedHosts.join(', ');
+    favoriteAppIdsDraft.value = [...preferences.favoriteAppIds];
     desktopRating.value = preferences.satisfaction;
   },
   { immediate: true, deep: true },
@@ -2309,6 +2380,24 @@ function saveBrowserHosts() {
     browserAllowedHosts: hosts,
   });
   notify('Browser actualizado', `Hosts permitidos: ${hosts.join(', ')}.`, {
+    kind: 'success',
+    sourceId: 'settings',
+    sourceLabel: 'Settings',
+  });
+}
+
+function toggleFavoriteApp(appId: string) {
+  favoriteAppIdsDraft.value = favoriteAppIdsDraft.value.includes(appId)
+    ? favoriteAppIdsDraft.value.filter((item) => item !== appId)
+    : [...favoriteAppIdsDraft.value, appId];
+}
+
+function saveFavoriteApps() {
+  void persistPreferences({
+    favoriteAppIds: favoriteAppIdsDraft.value,
+  });
+
+  notify('Launcher actualizado', `Favoritos guardados: ${favoriteAppIdsDraft.value.join(', ') || 'sin favoritos'}.`, {
     kind: 'success',
     sourceId: 'settings',
     sourceLabel: 'Settings',

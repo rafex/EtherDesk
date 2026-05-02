@@ -29,6 +29,7 @@ interface PreferencesBody {
   theme?: 'ocean' | 'sand';
   wallpaper?: 'ocean' | 'sunset' | 'graphite';
   browserAllowedHosts?: string[];
+  favoriteAppIds?: string[];
   defaultWindowSize?: {
     width?: number;
     height?: number;
@@ -169,6 +170,7 @@ export async function handlePreferencesRoute(request: IncomingMessage, response:
       theme: body?.theme,
       wallpaper: body?.wallpaper,
       browserAllowedHosts: body?.browserAllowedHosts ? normalizeHostList(body.browserAllowedHosts) : undefined,
+      favoriteAppIds: body?.favoriteAppIds ? normalizeStringList(body.favoriteAppIds, 12, 60) : undefined,
       defaultWindowSize: typeof width === 'number' && typeof height === 'number' ? { width, height } : undefined,
     });
 

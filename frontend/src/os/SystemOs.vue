@@ -11,6 +11,7 @@
     :apps="apps"
     :user-name="user?.name ?? 'ether'"
     :user-email="user?.email ?? 'demo@rafex.dev'"
+    :user-role="user?.role ?? 'guest'"
     :initial-rating="desktopRating"
     :os-version="osVersion"
     :preferences="preferences"

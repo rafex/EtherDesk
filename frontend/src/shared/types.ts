@@ -59,6 +59,7 @@ export interface DesktopPreferences {
   theme: 'ocean' | 'sand';
   wallpaper: 'ocean' | 'sunset' | 'graphite';
   browserAllowedHosts: string[];
+  favoriteAppIds: string[];
   defaultWindowSize: {
     width: number;
     height: number;
@@ -104,6 +105,20 @@ export interface WorkspaceState {
   }>;
 }
 
+export interface ToolkitToolPolicy {
+  flag: string;
+  usage: string;
+  description: string;
+  allowedRoles: string[];
+}
+
+export interface ToolkitPolicy {
+  name: string;
+  description: string;
+  allowedRoles: string[];
+  tools: ToolkitToolPolicy[];
+}
+
 export interface KernelDescriptor {
   name: string;
   version: string;
@@ -146,6 +161,7 @@ export interface KernelMonitorState {
   kernel: KernelDescriptor;
   preferences: DesktopPreferences;
   workspace: WorkspaceState;
+  toolkits: ToolkitPolicy[];
   metrics: {
     registeredApps: number;
     files: number;

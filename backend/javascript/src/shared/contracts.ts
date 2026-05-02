@@ -35,6 +35,7 @@ export interface DesktopPreferencesContract {
   theme: 'ocean' | 'sand';
   wallpaper: 'ocean' | 'sunset' | 'graphite';
   browserAllowedHosts: string[];
+  favoriteAppIds: string[];
   defaultWindowSize: {
     width: number;
     height: number;
@@ -78,4 +79,18 @@ export interface WorkspaceStateContract {
     type: 'notes' | 'terminal';
     updatedAt: string;
   }>;
+}
+
+export interface ToolkitToolPolicyContract {
+  flag: string;
+  usage: string;
+  description: string;
+  allowedRoles: string[];
+}
+
+export interface ToolkitPolicyContract {
+  name: string;
+  description: string;
+  allowedRoles: string[];
+  tools: ToolkitToolPolicyContract[];
 }
